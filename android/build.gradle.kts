@@ -1,9 +1,6 @@
-allprojects {
-    repositories {
-        google()
-        mavenCentral()
-    }
-}
+// ✅ Exemple "propre" pour android/build.gradle.kts
+import org.gradle.api.tasks.Delete
+import org.gradle.api.file.Directory
 
 val newBuildDir: Directory =
     rootProject.layout.buildDirectory
@@ -15,6 +12,7 @@ subprojects {
     val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
     project.layout.buildDirectory.value(newSubprojectBuildDir)
 }
+
 subprojects {
     project.evaluationDependsOn(":app")
 }

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Small notification icon — monochrome white (24x24dp) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Bell shape, white-only (required for status bar) -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,22a2,2 0,0 0,2 -2h-4a2,2 0,0 0,2 2zM19,17h-14v-5c0,-3.07 1.63,-5.64 4.5,-6.32v-0.68c0,-0.83 0.67,-1.5 1.5,-1.5s1.5,0.67 1.5,1.5v0.68c2.87,0.68 4.5,3.25 4.5,6.32v5z"/>
+</vector>

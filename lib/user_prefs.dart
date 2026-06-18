@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 /// Gestion centralisée des préférences utilisateur.
 /// - Singleton : UserPrefs.instance  (et compat UserPrefs())
@@ -29,6 +30,16 @@ class UserPrefs {
   static const _kEnableAfternoon = 'enableAfternoon';
   static const _kEnableEvening = 'enableEvening';
 
+  static Future<void> saveFavoriteText(int id, String text) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('fav_text_$id', text);
+  }
+
+  static Future<String?> getFavoriteText(int id) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('fav_text_$id');
+  }
+
   // Heures/Horaires
   static const _kMorningHour = 'morningHour';
   static const _kMorningMinute = 'morningMinute';
@@ -46,6 +57,9 @@ class UserPrefs {
   // Thème
   static const _kThemeMode = 'theme_mode'; // "light" | "dark" | "system"
 
+  //Father name
+  static const _fatherNameKey = 'father_name';
+
   // ============================================================
   // 🔔 NOTIFICATIONS — SWITCHS
   // ============================================================
@@ -61,7 +75,7 @@ class UserPrefs {
 
   Future<bool> getAfternoonEnabled() async {
     final sp = await _prefs();
-    return sp.getBool(_kEnableAfternoon) ?? false;
+    return sp.getBool(_kEnableAfternoon) ?? true;
   }
 
   Future<void> setAfternoonEnabled(bool v) async {
@@ -100,7 +114,7 @@ class UserPrefs {
 
   Future<TimeOfDay> getMorningTime() async {
     final sp = await _prefs();
-    final h = sp.getInt(_kMorningHour) ?? 7;
+    final h = sp.getInt(_kMorningHour) ?? 9;
     final m = sp.getInt(_kMorningMinute) ?? 0;
     return TimeOfDay(hour: h, minute: m);
   }
@@ -113,7 +127,7 @@ class UserPrefs {
 
   Future<TimeOfDay> getAfternoonTime() async {
     final sp = await _prefs();
-    final h = sp.getInt(_kAfternoonHour) ?? 14;
+    final h = sp.getInt(_kAfternoonHour) ?? 15;
     final m = sp.getInt(_kAfternoonMinute) ?? 0;
     return TimeOfDay(hour: h, minute: m);
   }
@@ -198,18 +212,42 @@ class UserPrefs {
     return sp.getString(_kThemeMode) ?? 'system';
   }
 
+  // ============================================================
+  // 🎨 PERSON NAME
+  // ============================================================
 
-// Si tu veux persister le dernier template choisi :
-  Future<void> _saveTemplateChoice() async {
-    // UserPrefs.instance.setString('lastTemplate', _selectedTemplate.name);
-    // Ajoute des helpers similaires à tes favoris si besoin.
+  static Future<void> savePersonName(String name) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('person_name', name);
   }
 
-  Future<void> _restoreTemplateChoice() async {
-    // final name = await UserPrefs.instance.getString('lastTemplate');
-    // if (name != null) _selectedTemplate = PremiumTemplate.values.firstWhere(
-    //   (e) => e.name == name, orElse: () => PremiumTemplate.darkLuxe,
-    // );
+  static Future<String?> getPersonName() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('person_name');
+  }
+
+  static Future<void> saveSelectedPersons(List<String> persons) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('selected_persons', persons);
+  }
+
+  static Future<List<String>> getSelectedPersons() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getStringList('selected_persons') ?? ['father'];
+  }
+
+  static Future<void> savePersonsData(Map<String, String> data) async {
+    final prefs = await SharedPreferences.getInstance();
+    prefs.setString('persons_data', jsonEncode(data));
+  }
+
+  static Future<Map<String, String>> getPersonsData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final jsonStr = prefs.getString('persons_data');
+
+    if (jsonStr == null) return {};
+
+    return Map<String, String>.from(jsonDecode(jsonStr));
   }
 
 }

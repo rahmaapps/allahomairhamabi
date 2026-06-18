@@ -40,11 +40,11 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Future<void> _initData() async {
-    final all = await _repo.getAllDuas();
-    final favIds = await UserPrefs.instance.getFavoriteIds();
+    final all = await _repo.getAllDuas();                        // List<Dua>
+    final favIds = await UserPrefs.instance.getFavoriteIds();    // List<int>
     setState(() {
       _all = all;
-      _results = all; // par défaut, tout afficher
+      _results = all;             // Par défaut on montre tout
       _favoriteIds = favIds.toSet();
     });
   }
@@ -63,7 +63,7 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   bool _containsArabic(String haystack, String needle) {
-    // Recherche simple, insensible à la casse "basique" pour l'arabe
+    // Recherche simple “contains” (insensible à la casse basique)
     return haystack.contains(needle);
   }
 
@@ -84,7 +84,7 @@ class _SearchScreenState extends State<SearchScreen> {
     HapticFeedback.selectionClick();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تم نسخ الدعاء')),
+        const SnackBar(content: Text('تم نسخ الدعاء')),
       );
     }
   }

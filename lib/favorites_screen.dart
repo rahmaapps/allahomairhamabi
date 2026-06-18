@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // Clipboard, Haptic
+import 'package:flutter/services.dart'; // Clipboard, Haptics
 import 'package:share_plus/share_plus.dart';
 
 import 'dua_repository.dart';
@@ -19,6 +19,9 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   late Future<List<Dua>> _futureFavs;
   List<Dua> _favs = [];
 
+  // --- Signature ajoutée lors du copier/partager ---
+  static const String _ATTR_SUFFIX_AR = '\n\n— من تطبيق اللَّهُمَّ ارْحَمْ أَبِي —';
+
   @override
   void initState() {
     super.initState();
@@ -26,10 +29,34 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   }
 
   Future<List<Dua>> _loadFavorites() async {
-    final ids = await UserPrefs.instance.getFavoriteIds(); // List<int>
-    final duas = await _repo.resolveFavorites(ids);
-    _favs = duas; // garder une copie locale
-    return duas;
+    final ids = await UserPrefs.instance.getFavoriteIds();
+    final all = await _repo.getAllDuas();
+
+    final List<Dua> result = [];
+
+    for (var d in all) {
+      if (ids.contains(d.id)) {
+        final savedText = await UserPrefs.getFavoriteText(d.id);
+
+        if (savedText != null && savedText.isNotEmpty) {
+          // ✅ utiliser texte personnalisé
+          result.add(
+            Dua(
+              id: d.id,
+              category: d.category,
+              length: d.length,
+              text: savedText,
+            ),
+          );
+        } else {
+          // ✅ fallback ancien comportement
+          result.add(d);
+        }
+      }
+    }
+
+    _favs = result;
+    return result;
   }
 
   Future<void> _refresh() async {
@@ -48,25 +75,30 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     });
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تمت إزالة الدعاء من المفضلة')),
+        const SnackBar(content: Text('تمت إزالة الدعاء من المفضلة')),
       );
     }
   }
 
   Future<void> _copyText(Dua d) async {
-    await Clipboard.setData(ClipboardData(text: d.text));
+    final textToCopy = '${d.text}$_ATTR_SUFFIX_AR';
+
+    await Clipboard.setData(ClipboardData(text: textToCopy));
     HapticFeedback.selectionClick();
+
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تم نسخ الدعاء')),
+        const SnackBar(content: Text('تم نسخ الدعاء')),
       );
     }
   }
 
+
   Future<void> _shareText(Dua d) async {
-    // Partage texte simple (évite le callback error de share_with_result)
-    await Share.share(d.text, subject: 'دعاء');
+    final textToShare = '${d.text}$_ATTR_SUFFIX_AR';
+    await Share.share(textToShare, subject: 'دعاء');
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -77,7 +109,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         title: const Text('المفضلة'),
         actions: [
           IconButton(
-            tooltip: 'Actualiser',
+            tooltip: 'تحديث',
             icon: const Icon(Icons.refresh),
             onPressed: _refresh,
           ),
@@ -163,6 +195,11 @@ class _DuaCard extends StatelessWidget {
               child: Text(
                 dua.text,
                 textAlign: TextAlign.center,
+
+                // ✅ AJOUT ICI
+                maxLines: 6,
+                overflow: TextOverflow.ellipsis,
+
                 style: TextStyle(
                   fontFamily: 'Lateef',
                   fontSize: 26,

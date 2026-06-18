@@ -1,41 +1,72 @@
+import java.util.Properties
+
+
 plugins {
     id("com.android.application")
-    id("kotlin-android")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
+    id("org.jetbrains.kotlin.android")
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// ---- Charge les secrets de signature depuis key.properties (s'il existe) ----
+val keystoreProps = Properties().apply {
+    val f = rootProject.file("key.properties")
+    if (f.exists()) {
+        load(f.inputStream())
+    }
+}
+
 android {
-    namespace = "com.example.test_1"
-    compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    namespace = "com.joumane.allahomairhamabi"
+
+    // Tu peux garder 36 si toutes tes libs/SDK sont compatibles. 34–36 conviennent.
+    compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.test_1"
+        // ⚠️ applicationId final : celui du Play Store
+        applicationId = "com.joumane.allahomairhamabi"
         minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
-        versionCode = flutter.versionCode
-        versionName = flutter.versionName
+        targetSdk = 36
+        versionCode = 4
+        versionName = "1.1"
     }
 
-    // ✅ Active Java 8+ + desugaring
+    // ✅ Java 17 + desugaring
     compileOptions {
-        // Tu es déjà en Java 17 côté projet, c'est OK.
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-        isCoreLibraryDesugaringEnabled = true   // <— IMPORTANT en Kotlin DSL
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
         jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
-    buildTypes {
-        release {
-            // TODO: ajoute ta vraie signature pour la prod
-            signingConfig = signingConfigs.getByName("debug")
+    // ---- Configs de signature ----
+
+    val hasSigning = keystoreProps.getProperty("storeFile")?.isNotBlank() == true
+
+    signingConfigs {
+        if (hasSigning) {
+            create("release") {
+                storeFile = file(keystoreProps.getProperty("storeFile"))
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+            }
         }
     }
+
+    buildTypes {
+        getByName("release") {
+            if (hasSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+            isMinifyEnabled = false
+            isShrinkResources = false
+        }
+        getByName("debug") { /* rien */ }
+    }
+
 }
 
 flutter {
@@ -43,7 +74,7 @@ flutter {
 }
 
 dependencies {
-    // ✅ Ajoute la lib de desugaring requise
+    // Desugaring (garde-le)
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.3")
-    // (Les autres dépendances auto‑gérées par Flutter resteront injectées via le plugin)
+    // Les dépendances Flutter restent gérées par le plugin
 }

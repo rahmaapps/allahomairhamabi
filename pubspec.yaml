@@ -2,7 +2,7 @@ name: test_1
 description: "App Father's Douaas"
 publish_to: 'none'
 
-version: 1.0.0+1
+version: 1.0.0+2
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -14,7 +14,7 @@ dependencies:
   google_fonts: ^6.2.0
   shared_preferences: ^2.3.2
   cupertino_icons: ^1.0.8
-  flutter_local_notifications: ^17.2.1
+  flutter_local_notifications: ^17.2.0
   timezone: ^0.9.2
   app_settings: ^5.2.0
   android_intent_plus: ^5.0.2
@@ -22,14 +22,18 @@ dependencies:
   share_plus: ^7.2.1
   provider: ^6.0.5
   path_provider: ^2.1.2
-
+  workmanager: ^0.9.0+3
+  url_launcher: ^6.3.0
+  font_awesome_flutter: ^10.7.0
+  in_app_review : ^2.0.9
 
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
-
+  flutter_native_splash: ^2.4.0
+  flutter_launcher_icons: ^0.13.1
 
 flutter:
   uses-material-design: true
@@ -43,10 +47,30 @@ flutter:
     - assets/premium/previews/emerald_thumb.png
     - assets/premium/previews/white_elegant_thumb.png
     - assets/premium/logo/app_logo_white.png
+    - assets/splash/splash_gold.png
+    - assets/icon/app_icon.png
 
 
   fonts:
     - family: Lateef
       fonts:
         - asset: assets/fonts/Lateef-Regular.ttf
+
+
+flutter_native_splash:
+  color: "#0E7A5B"
+  image: assets/splash/splash_gold.png
+  android: true
+  ios: false
+  web: false
+  android_12:
+    color: "#0E7A5B"
+    image: assets/splash/splash_gold.png
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icon/app_icon.png"
+  adaptive_icon_background: "#0E7A5B"   # même que ton fond vert
+  adaptive_icon_foreground: "assets/icon/app_icon.png"
 

@@ -1,240 +1,169 @@
-// lib/services/notifications_service.dart
-//
-// Version 2026 optimisée pour ton projet.
-// - Compatible avec ton DuaRepository (length + category obligatoires)
-// - JSON arabe (length = "قصيرة" / "طويلة")
-// - Notifications immédiates OK
-// - Notifications planifiées encore gelées (problème Samsung)
-// - TZ locale sans flutter_native_timezone
-//
-// Dépendances nécessaires :
-// flutter_local_notifications, timezone
-
-import 'dart:io';
-import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+// lib/notification_service.dart
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:timezone/data/latest.dart' as tz;
-import 'package:timezone/timezone.dart' as tz;
 
-import '../dua_repository.dart';
-import '../user_prefs.dart';
-
+/// Service singleton pour gérer les notifications natives
 class NotificationService {
   NotificationService._internal();
   static final NotificationService _instance = NotificationService._internal();
-
   factory NotificationService() => _instance;
-  static NotificationService get I => _instance;
+
   static NotificationService get instance => _instance;
 
-  final FlutterLocalNotificationsPlugin _plugin =
-  FlutterLocalNotificationsPlugin();
-
+  final FlutterLocalNotificationsPlugin _plugin = FlutterLocalNotificationsPlugin();
   bool _initialized = false;
 
-  // IDs stables
-  static const int kTestId = 999;
+  // IDs des canaux
+  static const String channelMorning = 'channel_morning';
+  static const String channelAfternoon = 'channel_afternoon';
+  static const String channelEvening = 'channel_evening';
 
-  static const String _channelId = 'daily_channel_id';
-  static const String _channelName = 'Daily Notifications';
-  static const String _channelDesc = 'Dou‘ā من التطبيق';
-
-  static const AndroidNotificationDetails _androidDetails =
-  AndroidNotificationDetails(
-    _channelId,
-    _channelName,
-    channelDescription: _channelDesc,
-    importance: Importance.max,
-    priority: Priority.high,
-    playSound: true,
-  );
-
-  // ---------------------------------------------------------------------------
-  // INIT
-  // ---------------------------------------------------------------------------
-  Future<void> init() async {
+  Future<void> initialize() async {
     if (_initialized) return;
 
-    // Timezones
-    try {
-      tz.initializeTimeZones();
-      debugPrint("[NOTIF] Timezones initialisées.");
-    } catch (e) {
-      debugPrint("[NOTIF][ERR] init timezones: $e");
-    }
+    const androidInit = AndroidInitializationSettings('@drawable/ic_stat_notification');
+    const darwinInit = DarwinInitializationSettings(
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestSoundPermission: true,
+    );
 
-    // Init plugin
-    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const initSettings = InitializationSettings(android: androidInit);
+    const initSettings = InitializationSettings(
+      android: androidInit,
+      iOS: darwinInit,
+    );
 
-    await _plugin.initialize(initSettings);
+    await _plugin.initialize(initSettings,
+        onDidReceiveNotificationResponse: (NotificationResponse response) async {
+          // Routage par action/payload si tu veux
+          if (kDebugMode) {
+            print('[Notifications] Tap sur notification: ${response.payload} action=${response.actionId}');
+          }
+        });
 
-    // Android 13+ : POST_NOTIFICATIONS permission
-    if (Platform.isAndroid) {
-      final androidImpl = _plugin.resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>();
-      try {
-        final granted = await androidImpl?.requestNotificationsPermission();
-        debugPrint("[NOTIF] Permission POST_NOTIFICATIONS = $granted");
-      } catch (e) {
-        debugPrint("[NOTIF][WARN] requestNotificationsPermission: $e");
-      }
-    }
+    // Android 13+ : permission runtime
+    /*final androidImpl = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    if (androidImpl != null) {
+      await androidImpl.requestPermission();
+    }*/
+
+    // Créer les canaux Android
+    await _createAndroidChannels();
 
     _initialized = true;
   }
 
-  // ---------------------------------------------------------------------------
-  // NOTIFICATION — IMMEDIATE
-  //
-  // showNow() utilise :
-  // - lengthFilter : UserPrefs si non fourni
-  // - categoryFilter : "normal" par défaut (aligné HomeScreen)
-  //
-  // ---------------------------------------------------------------------------
-  Future<void> showNow({
-    String? title,
-    String? body,
-    String? lengthFilter,
-    String? categoryFilter,
+  static Future<void> ensureInitialized() async {
+    await instance.initialize();
+  }
+
+  Future<void> _createAndroidChannels() async {
+    final android = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    if (android == null) return;
+
+    final channels = <AndroidNotificationChannel>[
+      const AndroidNotificationChannel(
+        channelMorning,
+        'Rappels du matin',
+        description: 'Notifications planifiées pour la période du matin',
+        importance: Importance.high,
+        playSound: true,
+        showBadge: true,
+      ),
+      const AndroidNotificationChannel(
+        channelAfternoon,
+        'Rappels de l\'après‑midi',
+        description: 'Notifications planifiées pour la période de l\'après‑midi',
+        importance: Importance.high,
+        playSound: true,
+        showBadge: true,
+      ),
+      const AndroidNotificationChannel(
+        channelEvening,
+        'Rappels du soir',
+        description: 'Notifications planifiées pour la période du soir',
+        importance: Importance.defaultImportance,
+        playSound: true,
+        showBadge: true,
+      ),
+    ];
+
+    for (final ch in channels) {
+      await android.createNotificationChannel(ch);
+    }
+  }
+
+  /// Affiche une notification sur le canal correspondant à [channelId].
+  Future<void> show({
+    required String channelId,
+    required int notificationId,
+    required String title,
+    required String body,
+    String? payload,
+    List<AndroidNotificationAction>? actions,
   }) async {
-    await init();
+    final androidDetails = AndroidNotificationDetails(
+      channelId,
+      '', // ignoré depuis Android 8+ (défini par le canal)
+      channelDescription: null,
+      priority: Priority.high,
+      importance: Importance.high,
+      icon: '@drawable/ic_stat_notification',
+      actions: actions,
+      styleInformation: const DefaultStyleInformation(true, true),
+    );
 
-    final effectiveTitle = title ?? 'دعاء اليوم';
+    const iosDetails = DarwinNotificationDetails(
+      interruptionLevel: InterruptionLevel.timeSensitive,
+    );
 
-    // 1) Si body fourni → on l’utilise
-    // 2) Sinon → on choisit un Doua via ton Repository
-    String finalBody;
-    if (body != null) {
-      finalBody = body;
-    } else {
-      final prefs = UserPrefs.instance;
-      final lf = lengthFilter ?? await prefs.getLengthFilter();
-      final cf = categoryFilter ?? "normal"; // fallback propre
+    final details = NotificationDetails(android: androidDetails, iOS: iosDetails);
 
-      final dua = await DuaRepository().getRandomDuaFiltered(
-        lengthFilter: lf,
-        categoryFilter: cf,
-      );
+    await _plugin.show(notificationId, title, body, details, payload: payload);
+  }
 
-      finalBody = dua?.text ?? '...';
+  /// Helper pour afficher selon période
+  Future<void> showPeriodReminder({
+    required String periodId, // 'period_morning' | 'period_afternoon' | 'period_evening'
+    required int hour,
+    required int minute,
+  }) async {
+    String channelId;
+    String prettyPeriod;
+    int notiId;
+    switch (periodId) {
+      case 'period_morning':
+        channelId = channelMorning;
+        prettyPeriod = 'الصباح';
+        notiId = 101;
+        break;
+      case 'period_afternoon':
+        channelId = channelAfternoon;
+        prettyPeriod = 'بعد الظهر';
+        notiId = 102;
+        break;
+      case 'period_evening':
+      default:
+        channelId = channelEvening;
+        prettyPeriod = 'المساء';
+        notiId = 103;
+        break;
     }
 
-    await _plugin.show(
-      777, // ID ponctuel
-      effectiveTitle,
-      finalBody,
-      const NotificationDetails(android: _androidDetails),
+    final hh = hour.toString().padLeft(2, '0');
+    final mm = minute.toString().padLeft(2, '0');
+
+    await show(
+      channelId: channelId,
+      notificationId: notiId,
+      title: 'تذكير — $prettyPeriod',
+      body: 'حان وقت تذكيرك — $hh:$mm',
+      payload: periodId,
+      actions: const [
+        AndroidNotificationAction('open', 'فتح'),
+        AndroidNotificationAction('skip', 'تجاهل'),
+      ],
     );
-  }
-
-  // ---------------------------------------------------------------------------
-  // NOTIFS PLANIFIÉES GELÉES
-  //
-  // Tu as choisi (à juste titre) de ne pas les activer tant que le problème
-  // Samsung A53 n’est pas géré (deep doze + exact alarms).
-  //
-  // Je laisse ici une version stable mais *non utilisée* pour plus tard.
-  // ---------------------------------------------------------------------------
-
-  Future<void> scheduleDaily({
-    required int id,
-    required TimeOfDay timeOfDay,
-    String? lengthFilter,
-    String? categoryFilter,
-  }) async {
-    await init();
-
-    final prefs = UserPrefs.instance;
-
-    // Préparation des filtres
-    final lf = lengthFilter ?? await prefs.getLengthFilter();
-    final cf = categoryFilter ?? "normal";
-
-    final dua = await DuaRepository().getRandomDuaFiltered(
-      lengthFilter: lf,
-      categoryFilter: cf,
-    );
-
-    final body = dua?.text ?? "...";
-
-    final now = tz.TZDateTime.now(tz.local);
-
-    var scheduled = tz.TZDateTime(
-      tz.local,
-      now.year,
-      now.month,
-      now.day,
-      timeOfDay.hour,
-      timeOfDay.minute,
-    );
-
-    // Si l'heure d'aujourd'hui est déjà passée → demain
-    if (!scheduled.isAfter(now)) {
-      scheduled = scheduled.add(const Duration(days: 1));
-    }
-
-    debugPrint("[SCHED] id=$id → ${scheduled.toLocal()}");
-
-    await _plugin.zonedSchedule(
-      id,
-      'دعاء اليوم',
-      body,
-      scheduled,
-      const NotificationDetails(android: _androidDetails),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      matchDateTimeComponents: DateTimeComponents.time,
-      uiLocalNotificationDateInterpretation:
-      UILocalNotificationDateInterpretation.absoluteTime,
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // RESCHEDULE (non utilisée tant que Samsung A53 bloque)
-  // ---------------------------------------------------------------------------
-  Future<void> rescheduleFromPrefs() async {
-    await init();
-
-    debugPrint("[NOTIF] rescheduleFromPrefs() ignoré pour Samsung.");
-
-    // On désactive volontairement tous les schedules
-    await _plugin.cancelAll();
-  }
-
-  // ---------------------------------------------------------------------------
-  // TEST : notification dans 1 minute (utile debug Pixel)
-  // ---------------------------------------------------------------------------
-  Future<DateTime> scheduleInOneMinuteTest() async {
-    await init();
-
-    final prefs = UserPrefs.instance;
-    final lf = await prefs.getLengthFilter();
-    final cf = "normal";
-
-    final dua = await DuaRepository().getRandomDuaFiltered(
-      lengthFilter: lf,
-      categoryFilter: cf,
-    );
-
-    final body = dua?.text ?? "...";
-
-    final nowTz = tz.TZDateTime.now(tz.local);
-    final scheduled = nowTz.add(const Duration(minutes: 1));
-
-    await _plugin.zonedSchedule(
-      kTestId,
-      "اختبار الإشعار",
-      body,
-      scheduled,
-      const NotificationDetails(android: _androidDetails),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-      UILocalNotificationDateInterpretation.absoluteTime,
-    );
-
-    debugPrint("[NOTIF][TEST] id=$kTestId → ${scheduled.toLocal()}");
-
-    return scheduled.toLocal();
   }
 }

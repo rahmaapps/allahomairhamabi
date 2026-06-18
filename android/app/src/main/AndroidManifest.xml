@@ -1,40 +1,39 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.test_1">
+    package="com.joumane.allahomairhamabi">
 
-    <!-- Permission notifications (Android 13+) -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Android 13+ : permission de notifications (runtime) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-
-    <!-- Déclarations de visibilité de package / intents -->
     <queries>
-        <intent>
-            <action android:name="android.intent.action.PROCESS_TEXT" />
-            <data android:mimeType="text/plain" />
-        </intent>
+        <!-- Nécessaire pour vérifier si WhatsApp est installé -->
+        <package android:name="com.whatsapp" />
+        <package android:name="com.whatsapp.w4b" />  <!-- WhatsApp Business -->
     </queries>
 
     <application
-        android:label="test_1"
-        android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name">
+
+        <!-- Embedding Flutter v2 -->
+        <meta-data
+            android:name="flutterEmbedding"
+            android:value="2" />
 
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
-            android:taskAffinity=""
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
 
-            <!-- Thème affiché pendant l'initialisation Flutter -->
+            <!-- Splash jusqu'au 1er frame -->
             <meta-data
-                android:name="io.flutter.embedding.android.NormalTheme"
-                android:resource="@style/NormalTheme" />
+                android:name="io.flutter.embedding.android.SplashScreenDrawable"
+                android:resource="@drawable/launch_background" />
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -42,23 +41,10 @@
             </intent-filter>
         </activity>
 
+        <!-- ⛔️ Ne PAS ajouter manuellement de <service> ici pour WorkManager/notifications.
+             Les plugins Flutter (workmanager, flutter_local_notifications, etc.)
+             injectent ce qu'il faut via manifest-merger. -->
 
-        <!-- À COMMENTER / SUPPRIMER TEMPORAIREMENT -->
-        <!--
-                <receiver
-                    android:name=".RestartReceiver"
-                    android:exported="false">
-                    <intent-filter>
-                        <action android:name="android.intent.action.BOOT_COMPLETED"/>
-                        <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
-                    </intent-filter>
-                </receiver>
-            -->
-
-                <!-- Ne pas supprimer : utilisé par l'outil Flutter -->
-        <meta-data
-            android:name="flutterEmbedding"
-            android:value="2" />
     </application>
 
 </manifest>
