@@ -38,33 +38,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   bool get isGraveVisit => _activeCategory == 'grave_visit';
 
-  String _getPersonWord() {
-    switch (selectedPerson) {
-      case PersonType.father:
-        return 'أبي';
-      case PersonType.mother:
-        return 'أمي';
-      case PersonType.parents:
-        return 'والديّ';
-      case PersonType.grandfather:
-        return 'جدي';
-      case PersonType.grandmother:
-        return 'جدتي';
-      case PersonType.brother:
-        return 'أخي';
-      case PersonType.sister:
-        return 'أختي';
-      case PersonType.son:
-        return 'ابني';
-      case PersonType.daughter:
-        return 'ابنتي';
-      case PersonType.husband:
-        return 'زوجي';
-      case PersonType.wife:
-        return 'زوجتي';
-    }
-  }
-
   //Suffixe des textes copiés ou partagés
   static const String _ATTR_SUFFIX_AR =
       '\n\n— من تطبيق اللَّهُمَّ ارْحَمْ أَبِي —';
@@ -144,156 +117,59 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
-  Future<String> _applyNameToDua(String text) async {
-    final name = await UserPrefs.getPersonName();
-
-    if (name == null || name.isEmpty) {
-      return text;
-    }
-
-    final personWord = _getPersonWord();
-
-    // remplace uniquement le mot (ex: أمي → أمي فاطمة)
-    return text.replaceAll(personWord, '$personWord $name');
-  }
-
-  String _getPersonWithName(PersonType person) {
-    final name = personsData[person.name];
-
-    String word;
-
-    switch (person) {
-      case PersonType.father:
-        word = 'أبي';
-        break;
-      case PersonType.mother:
-        word = 'أمي';
-        break;
-      case PersonType.parents:
-        word = 'والديّ';
-        break;
-      case PersonType.grandfather:
-        word = 'جدي';
-        break;
-      case PersonType.grandmother:
-        word = 'جدتي';
-        break;
-      case PersonType.brother:
-        word = 'أخي';
-        break;
-      case PersonType.sister:
-        word = 'أختي';
-        break;
-      case PersonType.son:
-        word = 'ابني';
-        break;
-      case PersonType.daughter:
-        word = 'ابنتي';
-        break;
-      case PersonType.husband:
-        word = 'زوجي';
-        break;
-      case PersonType.wife:
-        word = 'زوجتي';
-        break;
-    }
-
-    if (name != null && name.isNotEmpty) {
-      return '$word $name';
-    }
-
-    return word;
-  }
-
-  Future<String> _generateDuaForSelectedPersons(Dua baseDua) async {
-    final persons = personsData.keys.toList();
-
-    // ✅ aucun choix → fallback normal
-    if (persons.isEmpty) {
-      return baseDua.text;
-    }
-
-    // ✅ choisir une personne aléatoire
-    final randomPersonKey = persons[math.Random().nextInt(persons.length)];
-
-    final personEnum = PersonType.values.firstWhere(
-      (p) => p.name == randomPersonKey,
-    );
-
-    final personWithName = _getPersonWithName(personEnum);
-
-    String text = baseDua.text;
-
-    // ✅ remplacement intelligent
-    text = text
-        .replaceAll('والدي', personWithName)
-        .replaceAll('أبي', personWithName);
-
-    return text;
-  }
-
-  Future<String> _generateDua(Dua d) async {
-    if (personsData.isEmpty) {
-      return d.text;
-    }
+  // Source de vérité unique pour appliquer la personne/le prénom sélectionné
+  // au texte d'un dou'a. Reprend à l'identique la logique auparavant dupliquée
+  // dans _loadInitial() et _showNextFromDeck() (mêmes mots, même remplacement
+  // de "والدي" ET "أبي") afin de ne pas modifier le comportement existant.
+  String _personalizeDuaText(String baseText) {
+    if (personsData.isEmpty) return baseText;
 
     final persons = personsData.keys.toList();
-
-    // choisir une personne aléatoire
     final randomKey = persons[math.Random().nextInt(persons.length)];
-
-    final personEnum = PersonType.values.firstWhere(
-      (p) => p.name == randomKey,
-    );
-
     final name = personsData[randomKey];
 
     String word;
-
-    switch (personEnum) {
-      case PersonType.father:
+    switch (randomKey) {
+      case 'father':
         word = 'أبي';
         break;
-      case PersonType.mother:
+      case 'mother':
         word = 'أمي';
         break;
-      case PersonType.parents:
+      case 'parents':
         word = 'والديّ';
         break;
-      case PersonType.grandfather:
+      case 'grandfather':
         word = 'جدي';
         break;
-      case PersonType.grandmother:
+      case 'grandmother':
         word = 'جدتي';
         break;
-      case PersonType.brother:
+      case 'brother':
         word = 'أخي';
         break;
-      case PersonType.sister:
+      case 'sister':
         word = 'أختي';
         break;
-      case PersonType.son:
+      case 'son':
         word = 'ابني';
         break;
-      case PersonType.daughter:
+      case 'daughter':
         word = 'ابنتي';
         break;
-      case PersonType.husband:
+      case 'husband':
         word = 'زوجي';
         break;
-      case PersonType.wife:
+      case 'wife':
         word = 'زوجتي';
         break;
+      default:
+        word = 'أبي';
     }
 
-    final full = name != null && name.isNotEmpty ? '$word $name' : word;
+    final personText = (name != null && name.isNotEmpty) ? '$word $name' : word;
 
-    String text = d.text;
-
-    // remplacement principal
-    text = text.replaceAll('والدي', full);
-
-    return text;
+    return baseText.replaceAll('والدي', personText).replaceAll('أبي', personText);
   }
 
   Future<void> _loadInitial() async {
@@ -318,77 +194,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     if (d != null) {
       _currentId = d.id;
-
-      final persons = personsData.keys.toList();
-
-      if (persons.isEmpty) {
-        _currentDuaText = d.text;
-      } else {
-        final randomPerson = persons[math.Random().nextInt(persons.length)];
-
-        final personEnum = PersonType.values.firstWhere(
-          (p) => p.name == randomPerson,
-        );
-
-        final personText = _getPersonWithName(personEnum);
-
-        if (personsData.isEmpty) {
-          _currentDuaText = d.text;
-        } else {
-          final persons = personsData.keys.toList();
-
-          final randomKey = persons[math.Random().nextInt(persons.length)];
-
-          final name = personsData[randomKey];
-
-          String word;
-
-          switch (randomKey) {
-            case 'father':
-              word = 'أبي';
-              break;
-            case 'mother':
-              word = 'أمي';
-              break;
-            case 'parents':
-              word = 'والديّ';
-              break;
-            case 'grandfather':
-              word = 'جدي';
-              break;
-            case 'grandmother':
-              word = 'جدتي';
-              break;
-            case 'brother':
-              word = 'أخي';
-              break;
-            case 'sister':
-              word = 'أختي';
-              break;
-            case 'son':
-              word = 'ابني';
-              break;
-            case 'daughter':
-              word = 'ابنتي';
-              break;
-            case 'husband':
-              word = 'زوجي';
-              break;
-            case 'wife':
-              word = 'زوجتي';
-              break;
-            default:
-              word = 'أبي';
-          }
-
-          final personText =
-              (name != null && name.isNotEmpty) ? '$word $name' : word;
-
-          _currentDuaText = d.text
-              .replaceAll('والدي', personText)
-              .replaceAll('أبي', personText);
-        }
-      }
+      _currentDuaText = _personalizeDuaText(d.text);
 
       _isFavorite = await UserPrefs.instance.isFavorite(_currentId!);
       if (mounted) setState(() {});
@@ -707,77 +513,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
 
     _currentId = d.id;
-
-    final persons = personsData.keys.toList();
-
-    if (persons.isEmpty) {
-      _currentDuaText = d.text;
-    } else {
-      final randomPerson = persons[math.Random().nextInt(persons.length)];
-
-      final personEnum = PersonType.values.firstWhere(
-        (p) => p.name == randomPerson,
-      );
-
-      final personText = _getPersonWithName(personEnum);
-
-      if (personsData.isEmpty) {
-        _currentDuaText = d.text;
-      } else {
-        final persons = personsData.keys.toList();
-
-        final randomKey = persons[math.Random().nextInt(persons.length)];
-
-        final name = personsData[randomKey];
-
-        String word;
-
-        switch (randomKey) {
-          case 'father':
-            word = 'أبي';
-            break;
-          case 'mother':
-            word = 'أمي';
-            break;
-          case 'parents':
-            word = 'والديّ';
-            break;
-          case 'grandfather':
-            word = 'جدي';
-            break;
-          case 'grandmother':
-            word = 'جدتي';
-            break;
-          case 'brother':
-            word = 'أخي';
-            break;
-          case 'sister':
-            word = 'أختي';
-            break;
-          case 'son':
-            word = 'ابني';
-            break;
-          case 'daughter':
-            word = 'ابنتي';
-            break;
-          case 'husband':
-            word = 'زوجي';
-            break;
-          case 'wife':
-            word = 'زوجتي';
-            break;
-          default:
-            word = 'أبي';
-        }
-
-        final personText =
-            (name != null && name.isNotEmpty) ? '$word $name' : word;
-
-        _currentDuaText = d.text
-            .replaceAll('والدي', personText)
-            .replaceAll('أبي', personText);
-      }
-    }
+    _currentDuaText = _personalizeDuaText(d.text);
 
     _isFavorite = await UserPrefs.instance.isFavorite(_currentId!);
 

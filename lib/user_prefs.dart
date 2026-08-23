@@ -57,9 +57,6 @@ class UserPrefs {
   // Thème
   static const _kThemeMode = 'theme_mode'; // "light" | "dark" | "system"
 
-  //Father name
-  static const _fatherNameKey = 'father_name';
-
   // ============================================================
   // 🔔 NOTIFICATIONS — SWITCHS
   // ============================================================
