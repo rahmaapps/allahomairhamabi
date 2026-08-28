@@ -6,6 +6,7 @@ import 'home_screen.dart';
 import 'settings_screen.dart';
 import 'notification_service.dart';
 import 'theme_notifier.dart';
+import 'user_prefs.dart';
 
 // Clé de navigation globale (pour naviguer depuis les callbacks)
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -15,6 +16,12 @@ Future<void> main() async {
 
   // Initialiser le service de notifications
   await NotificationService.ensureInitialized();
+
+  // V1.2 — migration vers les ids globaux uniques : les anciens favoris
+  // (ambigus par nature, voir user_prefs.dart) sont effacés proprement une
+  // seule fois. `favoritesWereReset` sert uniquement à informer l'utilisateur.
+  final favoritesWereReset =
+      await UserPrefs.migrateFavoritesToGlobalIdsIfNeeded();
 
   // Choisir l'écran initial en fonction d'un flag persistant
   final prefs = await SharedPreferences.getInstance();
@@ -51,6 +58,16 @@ Future<void> main() async {
 
   // Consommer une éventuelle action cliquée en arrière-plan (stockée par le background handler)
   await _consumePendingNotificationAction();
+
+  // Message ponctuel et honnête si les anciens favoris ont été réinitialisés
+  // (mise à jour majeure du catalogue — voir UserPrefs.migrateFavoritesToGlobalIdsIfNeeded)
+  if (favoritesWereReset) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _showGlobalSnack(
+        'تم تحديث كبير في قاعدة الأدعية — تمت إعادة تعيين المفضلة القديمة، برجاء إضافة أدعيتك المفضلة من جديد.',
+      );
+    });
+  }
 }
 
 class MyApp extends StatelessWidget {

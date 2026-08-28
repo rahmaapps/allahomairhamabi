@@ -46,6 +46,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
               category: d.category,
               length: d.length,
               text: savedText,
+              personKey: d.personKey,
             ),
           );
         } else {

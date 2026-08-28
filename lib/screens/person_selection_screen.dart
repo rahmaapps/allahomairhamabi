@@ -41,6 +41,11 @@ class _PersonSelectionScreenState extends State<PersonSelectionScreen> {
       for (var person in PersonType.values) {
         controllers[person]!.text = data[person.name] ?? '';
       }
+
+      // ✅ V1.2 : personsData est la source du chip résumé — sans cette
+      // ligne, rouvrir l'écran avec des personnes déjà enregistrées affiche
+      // à tort "لم يتم اختيار أي شخص" malgré des cases cochées.
+      personsData = Map<String, String>.from(data);
     });
   }
 
@@ -69,7 +74,8 @@ class _PersonSelectionScreenState extends State<PersonSelectionScreen> {
         appBar: AppBar(
           title: const Text('اختيار الأشخاص'),
         ),
-        body: Padding(
+        body: SafeArea(
+          child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
@@ -233,6 +239,7 @@ class _PersonSelectionScreenState extends State<PersonSelectionScreen> {
                                 } else {
                                   selectedPersons.remove(person);
                                   controllers[person]!.clear();
+                                  personsData.remove(person.name); // ✅ V1.2 : synchronise le chip résumé
                                 }
                               });
                             },
@@ -326,6 +333,7 @@ class _PersonSelectionScreenState extends State<PersonSelectionScreen> {
 
               ),
             ],
+          ),
           ),
         ),
       ),

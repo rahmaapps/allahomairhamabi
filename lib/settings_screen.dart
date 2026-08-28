@@ -141,10 +141,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   bool _loading = true;
 
-  //Person name
-  final TextEditingController _personNameController = TextEditingController();
-  String? _personName;
-
   @override
   void initState() {
     super.initState();
@@ -170,8 +166,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final tmA = await prefs.getAfternoonTime();
     final tmE = await prefs.getEveningTime();
 
-    final personName = await UserPrefs.getPersonName();
-
     if (!mounted) return;
     setState(() {
       _selectedTheme = th;
@@ -184,9 +178,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _morningTime = tmM;
       _afternoonTime = tmA;
       _eveningTime = tmE;
-
-      _personName = personName;
-      _personNameController.text = personName ?? '';
 
       _loading = false;
     });
@@ -373,32 +364,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return [
 
       const SizedBox(height: 32),
-      const _SectionTitle('معلومات شخصية'),
-      const SizedBox(height: 8),
-
-      TextField(
-        controller: _personNameController,
-
-        keyboardType: TextInputType.text,
-        textInputAction: TextInputAction.done,
-        autofocus: false,
-        enableSuggestions: true,
-        autocorrect: false,
-
-        onChanged: (value) {
-          UserPrefs.savePersonName(value);
-        },
-
-        decoration: const InputDecoration(
-
-          labelText: 'اسم الشخص',
-          hintText: 'مثال: أحمد، فاطمة...',
-
-          border: OutlineInputBorder(),
-        ),
-      ),
-
-      const SizedBox(height: 24), // ✅ ESPACE ENTRE LES BLOC
 
       // const _SectionTitle('الفترات (إشعارات)'),
       const SizedBox(height: 8),

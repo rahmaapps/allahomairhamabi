@@ -40,15 +40,14 @@ flutter:
 
   assets:
     - assets/data/duas.json
-    - assets/premium/backgrounds/dark_luxe_bg.png
-    - assets/premium/backgrounds/emerald_bg.png
-    - assets/premium/backgrounds/white_elegant_bg.png
     - assets/premium/previews/dark_luxe_thumb.png
     - assets/premium/previews/emerald_thumb.png
     - assets/premium/previews/white_elegant_thumb.png
-    - assets/premium/logo/app_logo_white.png
     - assets/splash/splash_gold.png
     - assets/icon/app_icon.png
+    - assets/premium/templates/dark_luxe.png
+    - assets/premium/templates/emerald.png
+    - assets/premium/templates/white_elegant.png
 
 
   fonts:

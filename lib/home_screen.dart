@@ -20,6 +20,9 @@ import 'search_screen.dart';
 import 'screens/person_selection_screen.dart';
 import 'widgets/islamic_pattern_painter.dart';
 import 'widgets/islamic_bg_motif_painter.dart';
+import 'premium_templates.dart';
+import 'widgets/premium_export_card.dart';
+import 'dua_personalizer.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -70,6 +73,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // ===== Capture image (Option A – gradient inline, désactivée côté bouton) =====
   final GlobalKey _imageKey = GlobalKey();
 
+  // ===== Export Premium (carte-image partageable du dou'a affiché) =====
+  // Une seule clé : décision produit V1.2 — toujours EXACTEMENT une image
+  // partagée, quelle que soit la longueur du dou'a. PremiumExportCard
+  // restreint elle-même le rendu Dark Luxe paginé à sa première page.
+  final GlobalKey _exportKey = GlobalKey();
+  PremiumTemplate _selectedTemplate = PremiumTemplate.darkLuxe;
+
   @override
   void initState() {
     super.initState();
@@ -117,59 +127,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
-  // Source de vérité unique pour appliquer la personne/le prénom sélectionné
-  // au texte d'un dou'a. Reprend à l'identique la logique auparavant dupliquée
-  // dans _loadInitial() et _showNextFromDeck() (mêmes mots, même remplacement
-  // de "والدي" ET "أبي") afin de ne pas modifier le comportement existant.
-  String _personalizeDuaText(String baseText) {
-    if (personsData.isEmpty) return baseText;
-
-    final persons = personsData.keys.toList();
-    final randomKey = persons[math.Random().nextInt(persons.length)];
-    final name = personsData[randomKey];
-
-    String word;
-    switch (randomKey) {
-      case 'father':
-        word = 'أبي';
-        break;
-      case 'mother':
-        word = 'أمي';
-        break;
-      case 'parents':
-        word = 'والديّ';
-        break;
-      case 'grandfather':
-        word = 'جدي';
-        break;
-      case 'grandmother':
-        word = 'جدتي';
-        break;
-      case 'brother':
-        word = 'أخي';
-        break;
-      case 'sister':
-        word = 'أختي';
-        break;
-      case 'son':
-        word = 'ابني';
-        break;
-      case 'daughter':
-        word = 'ابنتي';
-        break;
-      case 'husband':
-        word = 'زوجي';
-        break;
-      case 'wife':
-        word = 'زوجتي';
-        break;
-      default:
-        word = 'أبي';
-    }
-
-    final personText = (name != null && name.isNotEmpty) ? '$word $name' : word;
-
-    return baseText.replaceAll('والدي', personText).replaceAll('أبي', personText);
+  // Source de vérité unique pour appliquer le prénom personnalisé au texte
+  // d'un dou'a (V1.2). CONTRAIREMENT à l'ancienne version, la personne n'est
+  // JAMAIS choisie au hasard : elle est déterminée par le personKey réel du
+  // Dua affiché (dua.personKey), qui vient lui-même de sa position dans le
+  // JSON. Logique pure déportée dans DuaPersonalizer (testable en isolation,
+  // voir test/dua_personalizer_test.dart).
+  String _personalizeDuaText(String baseText, String personKey) {
+    return DuaPersonalizer.personalize(baseText, personKey, personsData);
   }
 
   Future<void> _loadInitial() async {
@@ -180,21 +145,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     personsData = await UserPrefs.getPersonsData();
 
 
-    // 1) Essai avec la catégorie active
-    Dua? d = await _repo.getRandomDuaFiltered(
+    // 1) Essai avec la catégorie active, scindé par personnes sélectionnées
+    Dua? d = await _repo.getRandomDuaFilteredForPersons(
+      personKeys: personsData.keys.toList(),
       lengthFilter: _lengthFilter,
       categoryFilter: _activeCategory,
     );
 
-    // 2) Fallback : ignorer la catégorie si rien
-    d ??= await _repo.getRandomDuaFiltered(
+    // 2) Fallback : ignorer la catégorie si rien (toujours scindé par personnes)
+    d ??= await _repo.getRandomDuaFilteredForPersons(
+      personKeys: personsData.keys.toList(),
       lengthFilter: _lengthFilter,
       categoryFilter: 'all',
     );
 
     if (d != null) {
       _currentId = d.id;
-      _currentDuaText = _personalizeDuaText(d.text);
+      _currentDuaText = _personalizeDuaText(d.text, d.personKey);
 
       _isFavorite = await UserPrefs.instance.isFavorite(_currentId!);
       if (mounted) setState(() {});
@@ -249,46 +216,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
       // ✅ tirage correct
       final random = finalList[math.Random().nextInt(finalList.length)];
-      String text = random['text'];
+      final String text = random['text'] as String;
 
-      // ✅ appliquer nom + personne
-      final name = personsData[randomKey];
-
-      if (name != null && name.isNotEmpty) {
-
-        String baseWord;
-
-        switch (randomKey) {
-          case 'father': baseWord = 'أبي'; break;
-          case 'mother': baseWord = 'أمي'; break;
-          case 'brother': baseWord = 'أخي'; break;
-          case 'sister': baseWord = 'أختي'; break;
-          case 'son': baseWord = 'ابني'; break;
-          case 'daughter': baseWord = 'ابنتي'; break;
-          case 'husband': baseWord = 'زوجي'; break;
-          case 'wife': baseWord = 'زوجتي'; break;
-          default: baseWord = 'أبي';
-        }
-
-        final personText = '$baseWord $name';
-
-        // ✅ normalisation
-        text = text
-            .replaceAll('والدي', 'أبي')
-            .replaceAll('لأخي', 'أخي')
-            .replaceAll('لأبي', 'أبي')
-            .replaceAll('عن أخي', 'أخي');
-
-        // ✅ إزالة أي اسم قديم
-        text = text.replaceAll(RegExp('$baseWord\\s+\\w+'), baseWord);
-
-        // ✅ إضافة الاسم
-        text = text.replaceFirst(baseWord, personText);
-      }
-
-      // ✅ update UI
-      _currentDuaText = text;
-      _currentId = DateTime.now().millisecondsSinceEpoch;
+      // ✅ update UI — personnalisation via la source de vérité unique
+      // (basée sur randomKey, qui EST la personne réelle de ce tirage,
+      // jamais un choix aléatoire distinct du dou'a affiché).
+      _currentDuaText = _personalizeDuaText(text, randomKey);
+      // ✅ id réel du dou'a (V1.2) — jamais un timestamp : un favori créé
+      // à partir de ce repli doit pointer vers une entrée existante du JSON.
+      _currentId = random['id'] as int;
 
       if (mounted) setState(() {});
       _anim.forward(from: 0);
@@ -419,6 +355,114 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
+  // ===========================================================================
+  // Export Premium : capture du RepaintBoundary (_exportKey) → PNG → partage
+  // Toujours EXACTEMENT une image (décision produit V1.2), quelle que soit
+  // la longueur du dou'a. Même patron de capture/retry que _captureImage()
+  // ci-dessus.
+  // ===========================================================================
+  Future<Uint8List?> _renderPremiumPng() async {
+    try {
+      await WidgetsBinding.instance.endOfFrame; // assure que tout est peint
+
+      final boundary = _exportKey.currentContext?.findRenderObject()
+          as RenderRepaintBoundary?;
+      if (boundary == null) return null;
+
+      // La fermeture animée du bottom sheet peut laisser le repaint en
+      // attente sur plusieurs frames : un seul endOfFrame ne suffit pas
+      // toujours. Même patron de retry borné que _captureImage() ci-dessus.
+      int tries = 0;
+      while (boundary.debugNeedsPaint && tries < 5) {
+        await Future.delayed(const Duration(milliseconds: 16));
+        await WidgetsBinding.instance.endOfFrame;
+        tries++;
+      }
+
+      final ui.Image image = await boundary.toImage(pixelRatio: 3.0);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      return byteData?.buffer.asUint8List();
+    } catch (e, st) {
+      debugPrint('Erreur export Premium: $e\n$st');
+      return null;
+    }
+  }
+
+  Future<void> _sharePremiumImage() async {
+    final png = await _renderPremiumPng();
+    if (png == null) return;
+
+    await Share.shareXFiles([
+      XFile.fromData(png, name: 'dua_premium.png', mimeType: 'image/png'),
+    ]);
+  }
+
+  void _openTemplatePicker() {
+    showModalBottomSheet(
+      context: context,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (context) {
+        final items = PremiumTemplate.values;
+
+        return GridView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: items.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            mainAxisSpacing: 16,
+            crossAxisSpacing: 16,
+            childAspectRatio: 0.75,
+          ),
+          itemBuilder: (_, index) {
+            final t = items[index];
+            final selected = t == _selectedTemplate;
+
+            return InkWell(
+              onTap: () {
+                setState(() => _selectedTemplate = t);
+                Navigator.pop(context);
+                _sharePremiumImage();
+              },
+              child: Stack(
+                alignment: Alignment.bottomCenter,
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      image: DecorationImage(
+                        image: AssetImage(t.thumbAsset),
+                        fit: BoxFit.cover,
+                      ),
+                      border: Border.all(
+                        width: 2,
+                        color: selected
+                            ? Theme.of(context).colorScheme.primary
+                            : Colors.transparent,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black45,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    margin: const EdgeInsets.all(8),
+                    child: Text(
+                      t.displayName,
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _rebuildDeckFiltered({int? excludeId}) async {
 
     // ✅ DEBUG ICI (1ère ligne)
@@ -426,43 +470,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     await _refreshLengthFilter();
 
-    // 1) strict : longueur + catégorie
-    List<Dua> list = [];
-
-    if (personsData.isEmpty || personsData.keys.isEmpty) {
-
-      print("✅ USING GENERAL ONLY");
-
-      final data = await _repo.getFullJson();
-
-      final generalList =
-          data['general']?[_activeCategory] ??
-              data['general']?['normal'] ??
-              [];
-
-      list = generalList.map<Dua>((e) {
-        return Dua.fromJson(Map<String, dynamic>.from(e));
-      }).toList();
-
-      // ✅ TRÈS IMPORTANT : STOP ICI
-      _deckIds
-        ..clear()
-        ..addAll(list.map((d) => d.id));
-
-      _deckCursor = 0;
-
-      debugPrint('[DECK] GENERAL ONLY -> ids=${_deckIds.length}');
-
-      return; // 🚨 BLOQUE TOUTE AUTRE LOGIQUE
-    }
-
-    // 2) fallback : ignorer la catégorie si liste vide
-    if (list.isEmpty) {
-      list = await _repo.loadFiltered(
-        lengthFilter: _lengthFilter,
-        categoryFilter: 'all',
-      );
-    }
+    // Pool scindé par personnes sélectionnées (repli interne sur 'general'
+    // si personsData est vide) et par catégorie active réelle — voir
+    // DuaRepository.loadFilteredForPersons().
+    final list = await _repo.loadFilteredForPersons(
+      personKeys: personsData.keys.toList(),
+      lengthFilter: _lengthFilter,
+      categoryFilter: _activeCategory,
+    );
 
     _deckIds
       ..clear()
@@ -477,7 +492,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _deckCursor = 0;
 
     debugPrint(
-        '[DECK] cat=$_activeCategory len=$_lengthFilter -> ids=${_deckIds.length}');
+        '[DECK] cat=$_activeCategory len=$_lengthFilter persons=${personsData.keys.toList()} -> ids=${_deckIds.length}');
   }
 
   Future<void> _showNextFromDeck() async {
@@ -513,7 +528,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
 
     _currentId = d.id;
-    _currentDuaText = _personalizeDuaText(d.text);
+    _currentDuaText = _personalizeDuaText(d.text, d.personKey);
 
     _isFavorite = await UserPrefs.instance.isFavorite(_currentId!);
 
@@ -634,6 +649,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   elevation: 0,
                   centerTitle: true,
                   actions: [
+                    IconButton(
+                      tooltip: 'تصدير الدعاء كصورة',
+                      icon: const Icon(Icons.image_outlined, color: Colors.white),
+                      onPressed: _openTemplatePicker,
+                    ),
                     IconButton(
                       icon: const Icon(Icons.favorite, color: Colors.white),
                       onPressed: () {
@@ -1187,14 +1207,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
                               const SizedBox(width: 10),
 
-                              // ✅ تقييم التطبيق
+                              // ✅ مشاركة كصورة (V1.2 — remplace "تقييم
+                              // التطبيق" ; le mécanisme d'évaluation reste
+                              // prévu au MVP, voir _rateApp() ci-dessus,
+                              // conservé pour une intégration dédiée
+                              // ultérieure, non supprimé)
                               Expanded(
                                 child: FilledButton.icon(
-                                  onPressed: _rateApp,
-                                  icon: const Icon(Icons.star_rate_rounded,
+                                  onPressed: _openTemplatePicker,
+                                  icon: const Icon(Icons.image_outlined,
                                       color: Colors.white, size: 20),
                                   label: const Text(
-                                    'تقييم التطبيق',
+                                    'مشاركة كصورة',
                                     style: TextStyle(fontSize: 16),
                                   ),
                                   style: FilledButton.styleFrom(
@@ -1214,6 +1238,31 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   ),
                 ),
               ),
+
+          // ---- Rendu hors écran pour l'export Premium (capture PNG) ----
+          // Toujours EXACTEMENT une image (décision produit V1.2) :
+          // PremiumExportCard restreint elle-même le rendu Dark Luxe paginé
+          // à sa première page (voir widgets/premium_export_card.dart).
+          //
+          // IgnorePointer + Opacity quasi nulle — PAS Offstage (V1.2,
+          // Phase 9) : contrairement à Offstage, dont paint() ne peint
+          // JAMAIS son enfant quand offstage=true (empêchant
+          // RenderRepaintBoundary d'avoir un layer composité valide pour
+          // toImage(), d'où l'échec silencieux constaté sur appareil réel),
+          // Opacity continue de peindre son enfant même à une valeur
+          // proche de 0. Même pattern que l'export "Option A" ci-dessus.
+          IgnorePointer(
+            child: Opacity(
+              opacity: 0.01,
+              child: RepaintBoundary(
+                key: _exportKey,
+                child: PremiumExportCard(
+                  template: _selectedTemplate,
+                  duaText: _currentDuaText,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );

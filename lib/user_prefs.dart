@@ -209,20 +209,6 @@ class UserPrefs {
     return sp.getString(_kThemeMode) ?? 'system';
   }
 
-  // ============================================================
-  // 🎨 PERSON NAME
-  // ============================================================
-
-  static Future<void> savePersonName(String name) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('person_name', name);
-  }
-
-  static Future<String?> getPersonName() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('person_name');
-  }
-
   static Future<void> saveSelectedPersons(List<String> persons) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList('selected_persons', persons);
@@ -245,6 +231,43 @@ class UserPrefs {
     if (jsonStr == null) return {};
 
     return Map<String, String>.from(jsonDecode(jsonStr));
+  }
+
+  // ============================================================
+  // 🧹 MIGRATION V1.2 — IDs GLOBAUX (Option A : abandon propre)
+  // ============================================================
+  // Avant la V1.2, favorite_dua_ids ne contenait que l'ancien id local
+  // (1-200), partagé par jusqu'à 11 personnes différentes : un ancien
+  // favori est donc intrinsèquement ambigu (impossible de savoir avec
+  // certitude à quelle personne il appartenait). Décision produit validée :
+  // aucune résolution automatique (pas de matching approximatif, pas
+  // d'attribution par défaut au père) — les anciens favoris sont effacés
+  // proprement une seule fois, via un numéro de schéma idempotent.
+  static const _kSchemaVersion = 'dua_id_schema_version';
+  static const int currentDuaIdSchemaVersion = 2;
+
+  /// Retourne true si une migration a effectivement eu lieu (favoris
+  /// existants effacés), pour permettre d'en informer l'utilisateur une
+  /// seule fois. Idempotent : no-op si déjà exécutée.
+  static Future<bool> migrateFavoritesToGlobalIdsIfNeeded() async {
+    final prefs = await SharedPreferences.getInstance();
+    final current = prefs.getInt(_kSchemaVersion) ?? 1;
+
+    if (current >= currentDuaIdSchemaVersion) return false;
+
+    final oldFavoriteIds = prefs.getStringList(_kFavoriteIds) ?? const <String>[];
+    final favTextKeys =
+        prefs.getKeys().where((k) => k.startsWith('fav_text_')).toList();
+    final hadData = oldFavoriteIds.isNotEmpty || favTextKeys.isNotEmpty;
+
+    for (final k in favTextKeys) {
+      await prefs.remove(k);
+    }
+    await prefs.remove(_kFavoriteIds);
+
+    await prefs.setInt(_kSchemaVersion, currentDuaIdSchemaVersion);
+
+    return hadData;
   }
 
 }
