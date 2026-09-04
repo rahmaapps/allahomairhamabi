@@ -1,13 +1,19 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:share_plus/share_plus.dart';
 
 import 'dua_repository.dart';
 import 'models/dua.dart';
-import 'user_prefs.dart';
+import 'screens/dua_read_screen.dart';
+import 'theme/app_radii.dart';
+import 'theme/app_spacing.dart';
+import 'theme/app_typography.dart';
+import 'widgets/app_dua_result_card.dart';
 
+/// Recherche — spécification close (docs/ui_ux/ETAT_CONSOLIDE_UI_UX.md, §4).
+/// Le champ remplace l'AppBar (pas de titre `البحث`). Résultats en
+/// `AppDuaResultCard` (identique à Favoris, sans ♥), surlignage du terme
+/// uniquement ici (jamais transmis à `DuaReadScreen`).
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
 
@@ -18,11 +24,12 @@ class SearchScreen extends StatefulWidget {
 class _SearchScreenState extends State<SearchScreen> {
   final _repo = DuaRepository();
   final _controller = TextEditingController();
+  final _focusNode = FocusNode();
 
   List<Dua> _all = [];
   List<Dua> _results = [];
   Timer? _debounce;
-  Set<int> _favoriteIds = {}; // cache local des favoris
+  String _query = '';
 
   @override
   void initState() {
@@ -36,268 +43,204 @@ class _SearchScreenState extends State<SearchScreen> {
     _debounce?.cancel();
     _controller.removeListener(_onQueryChanged);
     _controller.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
   Future<void> _initData() async {
-    final all = await _repo.getAllDuas();                        // List<Dua>
-    final favIds = await UserPrefs.instance.getFavoriteIds();    // List<int>
+    final all = await _repo.getAllDuas();
+    if (!mounted) return;
     setState(() {
       _all = all;
-      _results = all;             // Par défaut on montre tout
-      _favoriteIds = favIds.toSet();
+      _results = all;
     });
   }
 
   void _onQueryChanged() {
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 220), () {
+    // Debounce 250 ms (§4 Recherche).
+    _debounce = Timer(const Duration(milliseconds: 250), () {
       final q = _controller.text.trim();
-      if (q.isEmpty) {
-        setState(() => _results = _all);
-        return;
-      }
-      final res = _all.where((d) => _containsArabic(d.text, q)).toList();
-      setState(() => _results = res);
+      setState(() {
+        _query = q;
+        _results = q.isEmpty ? _all : _all.where((d) => d.text.contains(q)).toList();
+      });
     });
   }
 
-  bool _containsArabic(String haystack, String needle) {
-    // Recherche simple “contains” (insensible à la casse basique)
-    return haystack.contains(needle);
+  Future<void> _openReading(Dua dua) async {
+    // Fermer le clavier avant la transition (navigation verrouillée).
+    _focusNode.unfocus();
+
+    final reduceMotion = MediaQuery.of(context).disableAnimations;
+
+    await Navigator.push(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            DuaReadScreen(duaId: dua.id, origin: DuaReadOrigin.search),
+        transitionDuration: Duration(milliseconds: reduceMotion ? 150 : 300),
+        reverseTransitionDuration: Duration(milliseconds: reduceMotion ? 150 : 300),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          if (reduceMotion) {
+            return FadeTransition(opacity: animation, child: child);
+          }
+          // S1 : glissement RTL 300ms easeInOutCubic — le nouvel écran
+          // entre par la gauche (sens RTL), comme B2 (§2 HOME).
+          final curved = CurvedAnimation(parent: animation, curve: Curves.easeInOutCubic);
+          return SlideTransition(
+            position: Tween<Offset>(begin: const Offset(-1, 0), end: Offset.zero)
+                .animate(curved),
+            child: child,
+          );
+        },
+      ),
+    );
+    // Recherche restaurée nativement par Flutter (le State de cet écran
+    // n'est pas détruit par un push) : terme, résultats et défilement
+    // inchangés. Aucun ♥ affiché sur les résultats (§4) → rien à
+    // resynchroniser ici, contrairement à Favoris (LOT 3.C.2).
   }
 
-  Future<void> _toggleFavorite(Dua d) async {
-    await UserPrefs.instance.toggleFavorite(d.id);
-    HapticFeedback.lightImpact();
-    setState(() {
-      if (_favoriteIds.contains(d.id)) {
-        _favoriteIds.remove(d.id);
-      } else {
-        _favoriteIds.add(d.id);
-      }
-    });
+  /// ٠١٢٣... — chiffres arabes-indiens, comme l'exemple du document (§4 :
+  /// `ابحث في ٢٢١٥ دعاءً`).
+  String _easternDigits(int n) {
+    const western = '0123456789';
+    const eastern = '٠١٢٣٤٥٦٧٨٩';
+    return n.toString().split('').map((c) {
+      final i = western.indexOf(c);
+      return i == -1 ? c : eastern[i];
+    }).join();
   }
 
-  Future<void> _copyText(Dua d) async {
-    await Clipboard.setData(ClipboardData(text: d.text));
-    HapticFeedback.selectionClick();
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تم نسخ الدعاء')),
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        // Le champ remplace l'AppBar — aucun Scaffold.appBar (§4).
+        body: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.lg,
+                  AppSpacing.md,
+                  AppSpacing.lg,
+                  AppSpacing.sm,
+                ),
+                child: TextField(
+                  controller: _controller,
+                  focusNode: _focusNode,
+                  autofocus: true,
+                  textDirection: TextDirection.rtl,
+                  textAlign: TextAlign.right,
+                  style: AppTypography.body.copyWith(color: cs.onSurface),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    constraints: const BoxConstraints(minHeight: 44),
+                    prefixIcon: Icon(Icons.search, color: cs.onSurfaceVariant),
+                    hintText: 'ابحث عن دعاء...',
+                    hintStyle: AppTypography.body.copyWith(color: cs.onSurfaceVariant),
+                    suffixIcon: _controller.text.isEmpty
+                        ? null
+                        : IconButton(
+                            tooltip: 'مسح',
+                            icon: Icon(Icons.clear, color: cs.onSurfaceVariant),
+                            onPressed: () {
+                              // Vide le champ en conservant le focus (§4).
+                              _controller.clear();
+                            },
+                          ),
+                    border: OutlineInputBorder(
+                      borderRadius: AppRadii.buttonRadius,
+                      borderSide: BorderSide(color: cs.outline, width: 1.5),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: AppRadii.buttonRadius,
+                      borderSide: BorderSide(color: cs.outline, width: 1.5),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: AppRadii.buttonRadius,
+                      borderSide: BorderSide(color: cs.primary, width: 1.5),
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: NotificationListener<ScrollStartNotification>(
+                  // Le clavier se ferme au premier défilement (§4).
+                  onNotification: (_) {
+                    _focusNode.unfocus();
+                    return false;
+                  },
+                  child: _buildResults(cs),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildResults(ColorScheme cs) {
+    if (_query.isEmpty) {
+      // État initial : glyphe ⌕ + compteur, aucun historique/suggestion.
+      return Center(
+        child: Text(
+          'ابحث في ${_easternDigits(_all.length)} دعاءً',
+          textDirection: TextDirection.rtl,
+          style: AppTypography.body.copyWith(color: cs.onSurfaceVariant),
+        ),
       );
     }
-  }
 
-  Future<void> _shareText(Dua d) async {
-    await Share.share(d.text, subject: 'دعاء');
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('البحث'),
-      ),
-      body: Column(
-        children: [
-          // Champ de recherche
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: TextField(
-              controller: _controller,
-              textDirection: TextDirection.rtl,
-              textAlign: TextAlign.right,
-              decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.search),
-                hintText: 'ابحث عن دعاء...',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                suffixIcon: (_controller.text.isEmpty)
-                    ? null
-                    : IconButton(
-                  tooltip: 'مسح',
-                  icon: const Icon(Icons.clear),
-                  onPressed: () {
-                    _controller.clear();
-                    FocusScope.of(context).unfocus();
-                  },
-                ),
-              ),
-            ),
-          ),
-
-          // Résultats
-          Expanded(
-            child: _results.isEmpty
-                ? const _EmptyResults()
-                : ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemCount: _results.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                final d = _results[index];
-                final isFav = _favoriteIds.contains(d.id);
-                return _SearchResultCard(
-                  dua: d,
-                  isFavorite: isFav,
-                  onToggleFavorite: () => _toggleFavorite(d),
-                  onCopy: () => _copyText(d),
-                  onShare: () => _shareText(d),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SearchResultCard extends StatelessWidget {
-  final Dua dua;
-  final bool isFavorite;
-  final VoidCallback onToggleFavorite;
-  final VoidCallback onCopy;
-  final VoidCallback onShare;
-
-  const _SearchResultCard({
-    required this.dua,
-    required this.isFavorite,
-    required this.onToggleFavorite,
-    required this.onCopy,
-    required this.onShare,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 12, offset: Offset(0,6))],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Meta (category + length)
-            Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              alignment: WrapAlignment.center,
-              children: [
-                _Chip(text: _categoryLabel(dua.category)),
-                _Chip(text: _lengthLabel(dua.length)),
-              ],
-            ),
-            const SizedBox(height: 8),
-
-            Directionality(
-              textDirection: TextDirection.rtl,
-              child: Text(
-                dua.text,
+    if (_results.isEmpty) {
+      // Aucun résultat : deux lignes, AUCUNE illustration (§4) — `AppEmptyState`
+      // rend toujours un filigrane, il ne convient donc pas ici (c'est le
+      // gabarit générique à 4 couches du §3, différent de ce cas précis) ;
+      // état dédié minimal à la place. Le document ne fixe pas le libellé
+      // exact — texte minimal factuel retenu ici, à valider si besoin.
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'لا توجد نتائج',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontFamily: 'Lateef',
-                  fontSize: 24,
-                  height: 1.6,
-                  color: theme.colorScheme.onSurface,
-                ),
+                textDirection: TextDirection.rtl,
+                style: AppTypography.body.copyWith(color: cs.onSurface),
               ),
-            ),
-
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                IconButton(
-                  tooltip: 'مفضلة',
-                  icon: Icon(
-                    isFavorite ? Icons.favorite : Icons.favorite_outline,
-                    color: isFavorite ? Colors.red : theme.colorScheme.onSurface,
-                  ),
-                  onPressed: onToggleFavorite,
-                ),
-                IconButton(
-                  tooltip: 'نسخ',
-                  icon: const Icon(Icons.copy),
-                  onPressed: onCopy,
-                ),
-                IconButton(
-                  tooltip: 'مشاركة',
-                  icon: const Icon(Icons.share),
-                  onPressed: onShare,
-                ),
-              ],
-            ),
-          ],
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                'جرّب كلمة أخرى',
+                textAlign: TextAlign.center,
+                textDirection: TextDirection.rtl,
+                style: AppTypography.label.copyWith(color: cs.onSurfaceVariant),
+              ),
+            ],
+          ),
         ),
-      ),
-    );
-  }
-
-  String _categoryLabel(String c) {
-    switch (c.trim().toLowerCase()) {
-      case 'friday':
-        return 'الجمعة';
-      case 'ramadan':
-        return 'رمضان';
-      default:
-        return 'عام';
+      );
     }
-  }
 
-  String _lengthLabel(String l) {
-    // Ton JSON : "قصيرة" | "طويلة"
-    if (l.trim() == 'طويلة') return 'طويلة';
-    return 'قصيرة';
-  }
-}
-
-class _Chip extends StatelessWidget {
-  final String text;
-  const _Chip({required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final bg = theme.brightness == Brightness.dark
-        ? Colors.white10
-        : Colors.black12;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: theme.colorScheme.onSurface.withOpacity(0.8),
-          fontSize: 12,
-        ),
-      ),
-    );
-  }
-}
-
-class _EmptyResults extends StatelessWidget {
-  const _EmptyResults();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Padding(
-        padding: EdgeInsets.all(32),
-        child: Text('لا توجد نتائج'),
-      ),
+    return ListView.separated(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      itemCount: _results.length,
+      separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.md),
+      itemBuilder: (context, index) {
+        final d = _results[index];
+        return AppDuaResultCard(
+          text: d.text,
+          highlightQuery: _query,
+          onTap: () => _openReading(d),
+        );
+      },
     );
   }
 }
