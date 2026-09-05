@@ -102,17 +102,6 @@ class _SearchScreenState extends State<SearchScreen> {
     // resynchroniser ici, contrairement à Favoris (LOT 3.C.2).
   }
 
-  /// ٠١٢٣... — chiffres arabes-indiens, comme l'exemple du document (§4 :
-  /// `ابحث في ٢٢١٥ دعاءً`).
-  String _easternDigits(int n) {
-    const western = '0123456789';
-    const eastern = '٠١٢٣٤٥٦٧٨٩';
-    return n.toString().split('').map((c) {
-      final i = western.indexOf(c);
-      return i == -1 ? c : eastern[i];
-    }).join();
-  }
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -189,9 +178,11 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget _buildResults(ColorScheme cs) {
     if (_query.isEmpty) {
       // État initial : glyphe ⌕ + compteur, aucun historique/suggestion.
+      // Chiffres occidentaux (décision UX — remplace les chiffres
+      // arabes-indiens initialement prévus par §3 pour ce cas précis).
       return Center(
         child: Text(
-          'ابحث في ${_easternDigits(_all.length)} دعاءً',
+          'ابحث في ${_all.length} دعاء',
           textDirection: TextDirection.rtl,
           style: AppTypography.body.copyWith(color: cs.onSurfaceVariant),
         ),

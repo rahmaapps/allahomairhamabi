@@ -25,9 +25,24 @@ class NotificationService {
   static const String channelAfternoon = 'channel_afternoon';
   static const String channelEvening = 'channel_evening';
 
-  /// Initialisation (à appeler très tôt, ex: dans `main()`)
-  Future<void> initialize() async {
-    if (_initialized) return;
+  /// Initialisation (à appeler très tôt, ex: dans `main()`).
+  ///
+  /// `requestPermission` (`true` par défaut — comportement historique
+  /// inchangé pour tout appelant existant, ex. `SettingsScreen`) sépare
+  /// l'amorçage du plugin — toujours effectué, silencieux, création des
+  /// canaux Android — de la demande de permission runtime elle-même, seul
+  /// déclencheur possible d'un dialogue système. `main()` passe `false`
+  /// pour un tout premier lancement (LOT 3.E.1 correction — « aucun
+  /// dialogue au premier lancement ») ; c'est alors `OnboardingScreen` qui
+  /// déclenche la demande lui-même, une seule fois, via
+  /// [requestPermissionIfNeeded].
+  Future<void> initialize({bool requestPermission = true}) async {
+    if (_initialized) {
+      if (requestPermission && Platform.isAndroid) {
+        await _requestAndroidNotificationsPermissionIfNeeded();
+      }
+      return;
+    }
 
     // ✅ Icône par défaut (évite d’avoir à la redéfinir sur chaque notification)
     const androidInit = AndroidInitializationSettings('@drawable/ic_stat_notification');
@@ -65,17 +80,30 @@ class NotificationService {
       onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
     );
 
-    // 🔐 Android 13+ : demander la permission runtime puis créer les canaux
+    // 🔐 Android 13+ : demander la permission runtime (si demandée) puis
+    // créer les canaux.
     if (Platform.isAndroid) {
-      await _requestAndroidNotificationsPermissionIfNeeded();
+      if (requestPermission) {
+        await _requestAndroidNotificationsPermissionIfNeeded();
+      }
       await _createAndroidChannels();
     }
 
     _initialized = true;
   }
 
-  static Future<void> ensureInitialized() async {
-    await instance.initialize();
+  static Future<void> ensureInitialized({bool requestPermission = true}) async {
+    await instance.initialize(requestPermission: requestPermission);
+  }
+
+  /// Déclenche seul la demande de permission runtime (Android), sans
+  /// jamais toucher à l'amorçage du plugin (`initialize()` a déjà dû être
+  /// appelé avant, depuis `main()`) — pensé pour être appelé sans risque
+  /// depuis un écran (`OnboardingScreen`) sans relancer `_plugin.initialize()`.
+  /// No-op si déjà accordée ou déjà tranchée par l'OS ; no-op hors Android.
+  Future<void> requestPermissionIfNeeded() async {
+    if (!Platform.isAndroid) return;
+    await _requestAndroidNotificationsPermissionIfNeeded();
   }
 
   /// Demande la permission d'afficher des notifications (Android 13+)
@@ -93,6 +121,25 @@ class NotificationService {
       }
     } else if (kDebugMode) {
       print('[Notifications][Android] already enabled');
+    }
+  }
+
+  /// Lecture seule du statut actuel de la permission de notifications
+  /// (Android) — ne redemande jamais, `initialize()` l'a déjà fait au
+  /// démarrage (LOT 3.E.1 : ligne d'info si refusée à l'Onboarding, §4
+  /// Onboarding : « permission refusée → une seule ligne d'information,
+  /// aucun dialogue, aucune relance »). `true` par défaut hors Android ou
+  /// si le plugin n'est pas résolvable (ex. `flutter_test` sans mock de
+  /// plateforme) — mieux vaut ne pas afficher la ligne que bloquer l'écran.
+  Future<bool> notificationsPermissionGranted() async {
+    if (!Platform.isAndroid) return true;
+    try {
+      final androidImpl = _plugin
+          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+      if (androidImpl == null) return true;
+      return await androidImpl.areNotificationsEnabled() ?? true;
+    } catch (_) {
+      return true;
     }
   }
 

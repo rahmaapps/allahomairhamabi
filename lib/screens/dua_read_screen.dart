@@ -22,9 +22,10 @@ enum DuaReadOrigin { search, favorites }
 /// Écran de lecture mutualisé (§ Lecture, cadré LOT 3.D.0) — ouvert depuis
 /// Recherche ou Favoris. Pleine page, aucune `AppCard`, aucun ombre/rayon.
 /// AppBar sans titre (retour + ♥), texte `AppTypography.duaBody` centré
-/// (défile si trop long), catégorie sous le texte, barre basse fixe
-/// نسخ (secondaire) / مشاركة (primaire). Aucun تدعو آخر, aucun swipe,
-/// aucune suggestion.
+/// (défile si trop long), barre basse fixe نسخ (secondaire) / مشاركة
+/// (primaire). Aucune catégorie affichée (retirée — audit UX : aucune
+/// valeur réelle sur cet écran, ~70 % des douʿās sont `عام`), aucun
+/// تدعو آخر, aucun swipe, aucune suggestion.
 class DuaReadScreen extends StatefulWidget {
   const DuaReadScreen({
     super.key,
@@ -101,20 +102,6 @@ class _DuaReadScreenState extends State<DuaReadScreen> {
     Share.share('$text$_attrSuffix', subject: 'دعاء');
   }
 
-  /// Même mapping que celui déjà utilisé ailleurs dans le projet (ancien
-  /// `favorites_screen.dart`/`search_screen.dart`) — repris tel quel, non
-  /// redécidé.
-  String _categoryLabel(String category) {
-    switch (category.trim().toLowerCase()) {
-      case 'friday':
-        return 'الجمعة';
-      case 'ramadan':
-        return 'رمضان';
-      default:
-        return 'عام';
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -179,16 +166,6 @@ class _DuaReadScreenState extends State<DuaReadScreen> {
                                     textAlign: TextAlign.center,
                                     textDirection: TextDirection.rtl,
                                     style: AppTypography.duaBody.copyWith(color: cs.onSurface),
-                                  ),
-                                  const SizedBox(height: AppSpacing.lg),
-                                  Container(width: 32, height: 1, color: cs.outline),
-                                  const SizedBox(height: AppSpacing.sm),
-                                  Text(
-                                    _categoryLabel(dua.category),
-                                    textDirection: TextDirection.rtl,
-                                    style: AppTypography.label.copyWith(
-                                      color: cs.onSurfaceVariant,
-                                    ),
                                   ),
                                 ],
                               ),

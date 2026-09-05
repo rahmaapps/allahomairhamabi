@@ -3,8 +3,10 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'home_screen.dart';
+import 'screens/onboarding_screen.dart';
 import 'settings_screen.dart';
 import 'notification_service.dart';
+import 'theme/app_theme.dart';
 import 'theme_notifier.dart';
 import 'user_prefs.dart';
 
@@ -14,8 +16,20 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialiser le service de notifications
-  await NotificationService.ensureInitialized();
+  // Choisir l'écran initial en fonction d'un flag persistant — lu avant
+  // d'initialiser les notifications (voir juste en dessous).
+  final prefs = await SharedPreferences.getInstance();
+  final completed = prefs.getBool('settings_completed') ?? false;
+
+  // Initialiser le service de notifications. La demande de permission
+  // système ne doit jamais apparaître avant que l'utilisateur n'ait vu
+  // l'Onboarding (LOT 3.E.1 correction — « aucun dialogue au premier
+  // lancement ») : elle n'est déclenchée automatiquement ici que pour un
+  // utilisateur ayant déjà terminé l'Onboarding lors d'une session
+  // précédente (comportement au démarrage inchangé pour ce cas). Pour un
+  // tout premier lancement, c'est `OnboardingScreen` qui la déclenche,
+  // une seule fois, à l'écran « تذكير يومي؟ ».
+  await NotificationService.ensureInitialized(requestPermission: completed);
 
   // V1.2 — migration vers les ids globaux uniques : les anciens favoris
   // (ambigus par nature, voir user_prefs.dart) sont effacés proprement une
@@ -23,10 +37,10 @@ Future<void> main() async {
   final favoritesWereReset =
       await UserPrefs.migrateFavoritesToGlobalIdsIfNeeded();
 
-  // Choisir l'écran initial en fonction d'un flag persistant
-  final prefs = await SharedPreferences.getInstance();
-  final completed = prefs.getBool('settings_completed') ?? false;
-  final initialRoute = completed ? '/home' : '/settings';
+  // Premier lancement → Onboarding dédié (LOT 3.E.1), plus SettingsScreen
+  // (toujours accessible ensuite depuis HOME → ⋮ → « الإعدادات », route
+  // '/settings' conservée telle quelle pour cet accès).
+  final initialRoute = completed ? '/home' : '/onboarding';
 
   // Handler UI (foreground) pour les actions de notification
   NotificationService.onAction = (String? actionId, String? payload) async {
@@ -90,13 +104,14 @@ class MyApp extends StatelessWidget {
 
       // ⬇️ Active clairement les thèmes clair/sombre
       themeMode: theme.themeMode,
-      theme: ThemeData.light(useMaterial3: true),
-      darkTheme: ThemeData.dark(useMaterial3: true),
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
 
       initialRoute: initialRoute,
       routes: {
         '/home': (_) => const HomeScreen(),
         '/settings': (_) => const SettingsScreen(),
+        '/onboarding': (_) => const OnboardingScreen(),
       },
     );
   }

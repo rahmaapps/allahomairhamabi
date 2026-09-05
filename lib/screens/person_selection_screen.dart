@@ -1,9 +1,19 @@
-import 'dart:convert';
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+
 import '../models/person_type.dart';
+import '../theme/app_radii.dart';
+import '../theme/app_spacing.dart';
+import '../theme/app_typography.dart';
 import '../user_prefs.dart';
+import '../widgets/app_bar.dart';
+import '../widgets/app_chip.dart';
+import '../widgets/app_snackbar.dart';
 
-
+/// Person Selection — Mode Édition (docs/ui_ux/ETAT_CONSOLIDE_UI_UX.md, §4).
+/// AppBar h56, titre `تدعو لـ`, retour `→`, aucun CTA en bas : chaque
+/// coche/décoche/frappe s'enregistre immédiatement.
 class PersonSelectionScreen extends StatefulWidget {
   const PersonSelectionScreen({super.key});
 
@@ -12,22 +22,42 @@ class PersonSelectionScreen extends StatefulWidget {
 }
 
 class _PersonSelectionScreenState extends State<PersonSelectionScreen> {
-
   Set<PersonType> selectedPersons = {};
-
-  Map<PersonType, TextEditingController> controllers = {};
-  Map<String, String> personsData = {};
+  final Map<PersonType, TextEditingController> controllers = {};
+  final Map<PersonType, FocusNode> focusNodes = {};
+  final Map<PersonType, Timer?> _debounce = {};
 
   @override
   void initState() {
     super.initState();
-
-    // ✅ init controllers
-    for (var person in PersonType.values) {
+    for (final person in PersonType.values) {
       controllers[person] = TextEditingController();
+      final node = FocusNode();
+      node.addListener(() {
+        if (!node.hasFocus) {
+          _debounce[person]?.cancel();
+          _persist();
+        }
+      });
+      focusNodes[person] = node;
     }
-
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    for (final timer in _debounce.values) {
+      timer?.cancel();
+    }
+    // Écriture à la sortie (§4) — avant la disposition des contrôleurs.
+    _persist();
+    for (final controller in controllers.values) {
+      controller.dispose();
+    }
+    for (final node in focusNodes.values) {
+      node.dispose();
+    }
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -38,302 +68,179 @@ class _PersonSelectionScreenState extends State<PersonSelectionScreen> {
           .map((e) => PersonType.values.firstWhere((p) => p.name == e))
           .toSet();
 
-      for (var person in PersonType.values) {
+      for (final person in PersonType.values) {
         controllers[person]!.text = data[person.name] ?? '';
       }
-
-      // ✅ V1.2 : personsData est la source du chip résumé — sans cette
-      // ligne, rouvrir l'écran avec des personnes déjà enregistrées affiche
-      // à tort "لم يتم اختيار أي شخص" malgré des cases cochées.
-      personsData = Map<String, String>.from(data);
     });
   }
 
-  Future<void> _save() async {
-    Map<String, String> data = {};
-
-    for (var person in selectedPersons) {
-      final name = controllers[person]!.text.trim();
-
-      if (name.isNotEmpty) {
-        data[person.name] = name;
-      }
-    }
-
+  /// Persiste toutes les personnes sélectionnées, prénom écrit **même vide**
+  /// (§4 — correction du bug `data[person.name] = name` conditionnel).
+  Future<void> _persist() async {
+    final data = <String, String>{
+      for (final p in selectedPersons) p.name: controllers[p]!.text,
+    };
     await UserPrefs.savePersonsData(data);
+  }
 
-    if (!mounted) return;
-    Navigator.pop(context);
+  void _onNameChanged(PersonType person, String value) {
+    _debounce[person]?.cancel();
+    _debounce[person] = Timer(const Duration(milliseconds: 400), _persist);
+  }
+
+  void _toggle(BuildContext snackBarContext, PersonType person) {
+    if (selectedPersons.contains(person)) {
+      _uncheck(snackBarContext, person);
+    } else {
+      setState(() => selectedPersons.add(person));
+      _persist();
+    }
+  }
+
+  /// Décochage silencieux, jamais bloquant (§4) : suppression immédiate +
+  /// snackbar `تراجع` qui restaure la coche.
+  ///
+  /// `snackBarContext` doit être un descendant du `ScaffoldMessenger`
+  /// propre à cet écran (voir `build()`) — jamais `this.context` (l'élément
+  /// de `PersonSelectionScreen` lui-même se trouve *au-dessus* de ce
+  /// `ScaffoldMessenger` local, pas en dessous : `ScaffoldMessenger.of` y
+  /// retomberait sur celui, racine, de `MaterialApp`, partagé par toute
+  /// l'app — le snackbar restait alors affiché après avoir quitté l'écran,
+  /// y compris après retour au HOME).
+  void _uncheck(BuildContext snackBarContext, PersonType person) {
+    final previousName = controllers[person]!.text;
+
+    setState(() {
+      selectedPersons.remove(person);
+      controllers[person]!.clear();
+    });
+    _persist();
+
+    showAppUndoSnackBar(
+      snackBarContext,
+      message: 'تم إلغاء اختيار ${_possessiveLabel(person)}',
+      actionLabel: 'تراجع',
+      onUndo: () {
+        setState(() {
+          selectedPersons.add(person);
+          controllers[person]!.text = previousName;
+        });
+        _persist();
+      },
+    );
+  }
+
+  /// Libellés possessifs déjà établis dans l'écran (`أبي`, `أمي`...) —
+  /// repris tels quels, non redécidés par ce lot.
+  String _possessiveLabel(PersonType person) {
+    switch (person) {
+      case PersonType.father:
+        return 'أبي';
+      case PersonType.mother:
+        return 'أمي';
+      case PersonType.parents:
+        return 'والديّ';
+      case PersonType.grandfather:
+        return 'جدي';
+      case PersonType.grandmother:
+        return 'جدتي';
+      case PersonType.brother:
+        return 'أخي';
+      case PersonType.sister:
+        return 'أختي';
+      case PersonType.son:
+        return 'ابني';
+      case PersonType.daughter:
+        return 'ابنتي';
+      case PersonType.husband:
+        return 'زوجي';
+      case PersonType.wife:
+        return 'زوجتي';
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return Directionality(
       textDirection: TextDirection.rtl,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('اختيار الأشخاص'),
-        ),
-        body: SafeArea(
-          child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
+      // ScaffoldMessenger local à cet écran : le snackbar تراجع est ainsi
+      // physiquement détaché quand PersonSelectionScreen quitte l'arbre
+      // (retour arrière), au lieu du ScaffoldMessenger racine de
+      // MaterialApp (partagé par toute l'app — voir même correctif déjà
+      // appliqué à FavoritesScreen).
+      child: ScaffoldMessenger(
+        child: Scaffold(
+          appBar: AppTopBar(
+            title: 'تدعو لـ',
+            height: 56,
+            titleStyle: AppTypography.screenTitle.copyWith(color: cs.onPrimary),
+            leading: IconButton(
+              icon: Icon(Icons.arrow_forward, color: cs.onPrimary),
+              onPressed: () => Navigator.maybePop(context),
+            ),
+          ),
+          // Aucun CTA en bas (§4) : le bas de l'écran reste vide.
+          body: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'يُحفظ اختيارك تلقائيًا',
+                    textAlign: TextAlign.center,
+                    textDirection: TextDirection.rtl,
+                    style: AppTypography.label
+                        .copyWith(color: cs.onSurfaceVariant),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  Expanded(
+                    child: ListView.separated(
+                      itemCount: PersonType.values.length,
+                      separatorBuilder: (_, __) =>
+                          const SizedBox(height: AppSpacing.sm),
+                      itemBuilder: (context, index) {
+                        final person = PersonType.values[index];
+                        final isSelected = selectedPersons.contains(person);
 
-              const Text(
-                'اختر الأشخاص الذين تريد الدعاء لهم',
-                style: TextStyle(color: Color(0xFFD4AF37), fontWeight: FontWeight.w600,),
-                textAlign: TextAlign.center,
-              ),
-
-              const SizedBox(height: 6),
-
-              Text(
-                'تم اختيار ${selectedPersons.length} أشخاص',
-                style: const TextStyle(
-                  color: Color(0xFFD4AF37),
-                  fontWeight: FontWeight.w600,
-                ),
-
-              ),
-              const SizedBox(height: 6),
-              personsData.isEmpty
-                  ? const Text(
-                'لم يتم اختيار أي شخص',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white70),
-              )
-                  : Wrap(
-                alignment: WrapAlignment.center,
-                spacing: 8,
-                runSpacing: 8,
-                children: personsData.entries.map((e) {
-                  String label;
-
-                  switch (e.key) {
-                    case 'father':
-                      label = 'أبي';
-                      break;
-                    case 'mother':
-                      label = 'أمي';
-                      break;
-                    case 'parents':
-                      label = 'والديّ';
-                      break;
-                    case 'grandfather':
-                      label = 'جدي';
-                      break;
-                    case 'grandmother':
-                      label = 'جدتي';
-                      break;
-                    case 'brother':
-                      label = 'أخي';
-                      break;
-                    case 'sister':
-                      label = 'أختي';
-                      break;
-                    case 'son':
-                      label = 'ابني';
-                      break;
-                    case 'daughter':
-                      label = 'ابنتي';
-                      break;
-                    case 'husband':
-                      label = 'زوجي';
-                      break;
-                    case 'wife':
-                      label = 'زوجتي';
-                      break;
-                    default:
-                      label = '';
-                  }
-
-                  return
-                    InkWell(
-                        borderRadius: BorderRadius.circular(20),
-                        onTap: () {
-                          setState(() {
-                            selectedPersons.removeWhere((p) => p.name == e.key);
-                            personsData.remove(e.key); // ✅ IMPORTANT (ne pas oublier)
-                          });
-                        },
-                      child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 6),
-                    decoration: BoxDecoration(
-                      // ✅ fond doré léger
-                      color: const Color(0xFFB8860B)
-                          .withOpacity(0.2),
-
-                      // ✅ bordure dorée élégante
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: const Color(0xFFB8860B),
-                        width: 1.2,
-                      ),
-
-                      // ✅ petit effet shadow premium
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.person,
-                          color: Color(0xFFD4AF37),
-                          // ✅ doré appliqué correctement
-                          size: 18,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          '$label ${e.value}',
-                          style: const TextStyle(
-                            color:
-                            Colors.white, // ✅ texte lisible
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),);
-                }).toList(),
-              ),
-              const SizedBox(height: 12),
-
-              Expanded(
-                child: ListView(
-                  children: PersonType.values.map((person) {
-
-                    final isSelected = selectedPersons.contains(person);
-
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 4),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? const Color(0xFFD4AF37).withOpacity(0.08)
-                            : Colors.white.withOpacity(0.05),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: isSelected
-                              ? const Color(0xFFD4AF37)
-                              : Colors.white24,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Checkbox(
-                            value: isSelected,
-                            visualDensity: VisualDensity.compact,
-                            onChanged: (v) {
-                              setState(() {
-                                if (v == true) {
-                                  selectedPersons.add(person);
-                                  personsData[person.name] = controllers[person]!.text;
-                                } else {
-                                  selectedPersons.remove(person);
-                                  controllers[person]!.clear();
-                                  personsData.remove(person.name); // ✅ V1.2 : synchronise le chip résumé
-                                }
-                              });
-                            },
-                          ),
-
-                          Expanded(
-                            child: Text(
-                              person.label,
-                              style: const TextStyle(fontSize: 16),
+                        return Row(
+                          textDirection: TextDirection.rtl,
+                          children: [
+                            AppChip(
+                              variant: AppChipVariant.person,
+                              label: _possessiveLabel(person),
+                              selected: isSelected,
+                              onTap: () => _toggle(context, person),
                             ),
-                          ),
-
-                          SizedBox(
-                            width: 140,
-                            child: TextField(
-                              controller: controllers[person],
-                              enabled: isSelected,
-                              decoration: InputDecoration(
-                                hintText: isSelected ? 'أدخل الاسم' : 'اضغط لاختيار',
-                                hintStyle: TextStyle(
-                                  color: isSelected
-                                      ? Colors.grey
-                                      : Colors.grey,
-                                  fontSize: 13,
-                                ),
-
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 2,
-                                ),
-
-                                filled: true,
-                                fillColor: isSelected
-                                    ? Colors.white.withOpacity(0.1)
-                                    : Colors.grey.withOpacity(0.08),
-
-                                // ✅ bordure plus fine et premium
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                  borderSide: BorderSide(
-                                    color: Colors.grey.withOpacity(0.3),
+                            if (isSelected) ...[
+                              const SizedBox(width: AppSpacing.sm),
+                              Expanded(
+                                child: TextField(
+                                  controller: controllers[person],
+                                  focusNode: focusNodes[person],
+                                  textDirection: TextDirection.rtl,
+                                  style: AppTypography.body
+                                      .copyWith(color: cs.onSurface),
+                                  decoration: InputDecoration(
+                                    isDense: true,
+                                    hintText: 'الاسم (اختياري)',
+                                    border: OutlineInputBorder(
+                                        borderRadius: AppRadii.fieldRadius),
                                   ),
-                                ),
-
-                                // ✅ bordure active
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                  borderSide: BorderSide(
-                                    color: isSelected
-                                        ? const Color(0xFFD4AF37).withOpacity(0.5)
-                                        : Colors.grey.withOpacity(0.3),
-                                  ),
-                                ),
-
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFFD4AF37),
-                                    width: 1.5,
-                                  ),
+                                  onChanged: (v) => _onNameChanged(person, v),
                                 ),
                               ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
-
-              const SizedBox(height: 12),
-
-              SizedBox(
-                width: double.infinity,
-                child:
-                ElevatedButton(
-                  onPressed: _save,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1A7A4A),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                            ],
+                          ],
+                        );
+                      },
                     ),
                   ),
-                  child: const Text(
-                    'حفظ',
-                    style: TextStyle(color: Colors.white,fontSize: 16),
-                  ),
-                ),
-
+                ],
               ),
-            ],
-          ),
+            ),
           ),
         ),
       ),
