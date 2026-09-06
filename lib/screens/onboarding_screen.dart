@@ -16,12 +16,14 @@ import '../widgets/app_chip.dart';
 
 /// Onboarding — 2 écrans (docs/ui_ux/ETAT_CONSOLIDE_UI_UX.md, §4 Onboarding).
 ///
-/// Ordre retenu pour ce lot (LOT 3.E.1, décision produit explicite) :
-/// `تذكير يومي؟` puis `لمن تدعو؟` — inverse de l'exemple du document
-/// (`لمن تدعو؟` → `تذكير يومي؟`). Conséquence assumée : le sous-titre
-/// dynamique de l'étape rappel « reprenant la première personne cochée »,
-/// mentionné par le document pour ce cas précis, ne s'applique plus ici
-/// (aucune personne n'est encore choisie à ce stade) — non repris.
+/// LOT 3.H — ordre corrigé pour se conformer à la décision verrouillée :
+/// `لمن تدعو؟` (personnes) puis `تذكير يومي؟` (rappel). Remplace l'ordre
+/// inverse retenu par LOT 3.E.1. Comportement de chaque étape inchangé —
+/// seul l'ordre d'exécution change : la demande de permission notifications
+/// (fire-and-forget, jamais à l'ouverture, jamais via « تخطّي ») se déclenche
+/// désormais en quittant l'étape رappel via « التالي » (voir
+/// `_finishFromReminderStep`), puisque cette étape est désormais la
+/// dernière plutôt que la première.
 ///
 /// `e0` uniquement (`AppCard(level: content)`), aucun or, aucun élément du
 /// « privilège sacré » (§6.8-9). Aucun dialogue, aucune notation, aucune
@@ -72,7 +74,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     // d'info si la permission a déjà été refusée par ailleurs (ex.
     // désactivée manuellement dans les réglages système entre deux
     // lancements). La demande elle-même n'a lieu qu'au passage explicite
-    // à l'étape suivante, voir `_goToStep2`.
+    // hors de l'étape rappel, voir `_finishFromReminderStep`.
     _refreshNotificationStatus();
   }
 
@@ -115,8 +117,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   /// `main()` saute délibérément la demande de permission au tout premier
   /// lancement, et cet écran ne la déclenche jamais tout seul à
   /// l'ouverture (LOT 3.E.1 — « aucun dialogue automatique à l'ouverture »).
-  /// `requestIfNeeded` n'est passé à `true` que depuis `_goToStep2`, en
-  /// réponse à l'action explicite de l'utilisateur (« التالي ») quand le
+  /// `requestIfNeeded` n'est passé à `true` que depuis
+  /// `_finishFromReminderStep`, en réponse à l'action explicite de
+  /// l'utilisateur (« التالي » sur l'étape finale `تذكير يومي؟`) quand le
   /// rappel est actif — jamais depuis `initState`. Sans demande
   /// (`requestIfNeeded: false`), c'est une lecture seule, sûre à appeler à
   /// tout moment (`requestPermissionIfNeeded` ne touche jamais
@@ -183,16 +186,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     await UserPrefs.savePersonsData(data);
   }
 
+  /// Avance de l'étape « لمن تدعو؟ » vers l'étape رappel — simple
+  /// transition, aucune logique de permission ici (elle est déclenchée en
+  /// quittant l'étape رappel, désormais la dernière — voir
+  /// `_finishFromReminderStep`).
   Future<void> _goToStep2() async {
-    // Action explicite de l'utilisateur liée au rappel (« التالي » quitte
-    // l'étape رappel avec le rappel actif — activé par défaut, ou remis
-    // actif par l'utilisateur) : seul point de déclenchement de la demande
-    // de permission (LOT 3.E.1 — jamais à l'ouverture). Fire-and-forget :
-    // ne retarde jamais la transition d'étape.
-    if (_reminderEnabled && !_permissionRequestAttempted) {
-      _permissionRequestAttempted = true;
-      _refreshNotificationStatus(requestIfNeeded: true);
-    }
     setState(() => _step = 1);
     await _pageController.animateToPage(
       1,
@@ -208,6 +206,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       duration: const Duration(milliseconds: 280),
       curve: Curves.easeInOutCubic,
     );
+  }
+
+  /// « التالي » sur l'étape رappel (désormais la dernière) : action
+  /// explicite de l'utilisateur liée au rappel (rappel actif — activé par
+  /// défaut, ou remis actif par l'utilisateur) — seul point de
+  /// déclenchement de la demande de permission (LOT 3.E.1 — jamais à
+  /// l'ouverture, jamais via « تخطّي »). Fire-and-forget : ne retarde jamais
+  /// la sortie de l'onboarding.
+  Future<void> _finishFromReminderStep() async {
+    if (_reminderEnabled && !_permissionRequestAttempted) {
+      _permissionRequestAttempted = true;
+      _refreshNotificationStatus(requestIfNeeded: true);
+    }
+    await _finish();
   }
 
   /// Sortie (« التالي » à l'étape 2, ou « تخطّي » à tout moment) — tout est
@@ -300,7 +312,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 _ProgressIndicator(step: _step, count: 2, color: cs.primary, track: cs.outline),
                 const SizedBox(height: AppSpacing.xxl),
                 Text(
-                  _step == 0 ? 'تذكير يومي؟' : 'لمن تدعو؟',
+                  _step == 0 ? 'لمن تدعو؟' : 'تذكير يومي؟',
                   textDirection: TextDirection.rtl,
                   textAlign: TextAlign.center,
                   style: AppTypography.screenTitle
@@ -312,8 +324,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     controller: _pageController,
                     physics: const NeverScrollableScrollPhysics(),
                     children: [
-                      _buildReminderStep(cs),
                       _buildPersonsStep(cs),
+                      _buildReminderStep(cs),
                     ],
                   ),
                 ),
@@ -333,7 +345,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       child: AppButton(
                         role: AppButtonRole.primary,
                         label: 'التالي',
-                        onPressed: _step == 0 ? _goToStep2 : _finish,
+                        onPressed: _step == 0 ? _goToStep2 : _finishFromReminderStep,
                       ),
                     ),
                   ],
