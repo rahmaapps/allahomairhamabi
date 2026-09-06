@@ -10,202 +10,262 @@ import '../theme/app_typography.dart';
 import '../user_prefs.dart';
 import '../widgets/app_bar.dart';
 import '../widgets/app_button.dart';
+import '../widgets/app_card.dart';
+import '../widgets/app_empty_state.dart';
+import '../widgets/app_snackbar.dart';
 
-/// D'où l'écran a été ouvert. Cadré au LOT 3.D.0, verrouillé par
-/// l'architecture du LOT 3.D.1 — n'influence aujourd'hui ni le rendu ni la
-/// logique de cet écran (aucune des décisions verrouillées n'en dépend :
-/// pas de surlignage de recherche, pas de comportement différencié). Conservé
-/// tel quel car explicitement mandaté par l'architecture verrouillée, pas
-/// parce qu'un besoin technique interne l'exigerait — voir rapport LOT 3.D.1.
-enum DuaReadOrigin { search, favorites }
-
-/// Écran de lecture mutualisé (§ Lecture, cadré LOT 3.D.0) — ouvert depuis
-/// Recherche ou Favoris. Pleine page, aucune `AppCard`, aucun ombre/rayon.
-/// AppBar sans titre (retour + ♥), texte `AppTypography.duaBody` centré
-/// (défile si trop long), barre basse fixe نسخ (secondaire) / مشاركة
-/// (primaire). Aucune catégorie affichée (retirée — audit UX : aucune
-/// valeur réelle sur cet écran, ~70 % des douʿās sont `عام`), aucun
-/// تدعو آخر, aucun swipe, aucune suggestion.
+/// Écran de lecture mutualisé — **une carte de lecture agrandie**, pas un
+/// écran distinct (LOT 3.I, docs/ui_ux/LOT_3I_DUAREADSCREEN_SPEC.md).
+/// Ouvert depuis Recherche et Favoris. AppBar minimaliste (retour seul,
+/// zone B vide) ; carte N1 (`AppCard(level: hero)`, rosace incluse — §A.3
+/// option (a) : c'est littéralement « la carte du douʿā agrandie », aucune
+/// duplication locale) ; texte `duaLong` ; ♥ dans le **pied de la carte**,
+/// jamais dans l'AppBar ; نسخ/مشاركة sous la carte. Aucun fade/blur/gradient
+/// sur le texte religieux : le scroll se termine par une coupure nette.
 class DuaReadScreen extends StatefulWidget {
-  const DuaReadScreen({
-    super.key,
-    required this.duaId,
-    required this.origin,
-  });
+  const DuaReadScreen({super.key, required this.duaId});
 
   final int duaId;
-  final DuaReadOrigin origin;
 
   @override
   State<DuaReadScreen> createState() => _DuaReadScreenState();
 }
 
-class _DuaReadScreenState extends State<DuaReadScreen> {
+class _DuaReadScreenState extends State<DuaReadScreen>
+    with SingleTickerProviderStateMixin {
   final _repo = DuaRepository();
 
-  // Même suffixe que HOME (home_screen.dart) — dupliqué localement, comme
-  // déjà fait ailleurs dans le projet (aucune constante partagée existante).
+  // Même suffixe que HOME/Favoris — dupliqué localement (même motif déjà
+  // en place dans le projet, aucune constante partagée existante).
   static const String _attrSuffix = '\n\n— من تطبيق اللَّهُمَّ ارْحَمْ أَبِي —';
 
-  late final Future<Dua?> _futureDua;
+  // Un seul Future pour tout l'écran (§B.8) — douʿā et statut favori
+  // chargés ensemble, un seul FutureBuilder consomme le résultat.
+  late final Future<({Dua? dua, bool isFavorite})> _future;
   bool _isFavorite = false;
+
+  late final AnimationController _heartCtrl;
+  late final Animation<double> _heartScale;
 
   @override
   void initState() {
     super.initState();
-    _futureDua = _loadDua();
-    _loadFavoriteState();
+    _heartCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    );
+    _heartScale = Tween<double>(begin: 1, end: 1.12).animate(
+      CurvedAnimation(parent: _heartCtrl, curve: Curves.easeOut),
+    );
+    _future = _load();
+    // Synchronise `_isFavorite` une seule fois, à la résolution du Future
+    // (pas à chaque rebuild — `snap.data` resterait sinon figé sur l'état
+    // initial et écraserait un `_toggleFavorite` ultérieur).
+    _future.then((data) {
+      if (mounted) setState(() => _isFavorite = data.isFavorite);
+    });
   }
 
-  /// Charge le douʿā par `duaId` (jamais d'objet `Dua` copié depuis
-  /// l'appelant). Résolution du texte identique au motif déjà utilisé par
-  /// Favoris : texte personnalisé sauvegardé → repli sur le texte JSON brut.
-  Future<Dua?> _loadDua() async {
+  @override
+  void dispose() {
+    _heartCtrl.dispose();
+    super.dispose();
+  }
+
+  /// Résolution du texte identique au motif déjà utilisé par Favoris/HOME :
+  /// texte personnalisé sauvegardé → repli sur le texte JSON brut.
+  Future<({Dua? dua, bool isFavorite})> _load() async {
     final dua = await _repo.getById(widget.duaId);
-    if (dua == null) return null;
+    if (dua == null) return (dua: null, isFavorite: false);
 
     final savedText = await UserPrefs.getFavoriteText(dua.id);
-    if (savedText != null && savedText.isNotEmpty) {
-      return Dua(
-        id: dua.id,
-        category: dua.category,
-        length: dua.length,
-        text: savedText,
-        personKey: dua.personKey,
-      );
-    }
-    return dua;
-  }
+    final resolved = (savedText != null && savedText.isNotEmpty)
+        ? Dua(
+            id: dua.id,
+            category: dua.category,
+            length: dua.length,
+            text: savedText,
+            personKey: dua.personKey,
+          )
+        : dua;
 
-  Future<void> _loadFavoriteState() async {
     final isFav = await UserPrefs.instance.isFavorite(widget.duaId);
-    if (mounted) setState(() => _isFavorite = isFav);
+    return (dua: resolved, isFavorite: isFav);
   }
 
-  /// `UserPrefs` est l'unique source de vérité — aucun état local
-  /// indépendant. Retirer ♥ ne ferme jamais cet écran (simple `setState`).
+  /// `UserPrefs` reste l'unique source de vérité (§B.4) — aucun état local
+  /// indépendant. Retirer le ♥ ne ferme jamais l'écran (simple `setState`).
+  /// Animation uniquement à l'ajout (scale 1 → 1.12 → 1, 200 ms) — asymétrie
+  /// volontaire déjà spécifiée pour le ♥ du HOME (§A.5/§2).
   Future<void> _toggleFavorite() async {
+    HapticFeedback.selectionClick();
+    final wasFavorite = _isFavorite;
     await UserPrefs.instance.toggleFavorite(widget.duaId);
     final isFav = await UserPrefs.instance.isFavorite(widget.duaId);
-    if (mounted) setState(() => _isFavorite = isFav);
+    if (!mounted) return;
+    setState(() => _isFavorite = isFav);
+    if (!wasFavorite && isFav) {
+      _heartCtrl.forward(from: 0).then((_) => _heartCtrl.reverse());
+    }
   }
 
+  /// Toast §3 (fond `textPrimary`, texte `onPrimary`, 2,5 s, aucun bouton)
+  /// — remplace le `SnackBar` Material brut utilisé avant ce lot (§B.6).
   void _copy(String text) {
     Clipboard.setData(ClipboardData(text: '$text$_attrSuffix'));
     HapticFeedback.selectionClick();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('تم النسخ ✓'), duration: Duration(seconds: 1)),
-    );
+    showAppToast(context, 'تم النسخ');
   }
 
+  /// Partage texte simple uniquement, mécanisme natif existant — aucun
+  /// partage image dans cette interface (§B.7).
   void _share(String text) {
     Share.share('$text$_attrSuffix', subject: 'دعاء');
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    // Même lecture que HOME/Favoris (LOT 2.2 / 3.C.1) : jamais
-    // `ColorScheme.onPrimary` pour le texte/icônes d'AppBar.
-    final appBarForeground = isDark ? AppColorsDark.textPrimary : AppColorsLight.onPrimary;
+    // Même lecture que HOME/Favoris/Visite (LOT 2.2) : ivoire fixe par
+    // mode, jamais `cs.onPrimary` (illisible sur le fond `appBar` Dark).
+    final appBarForeground =
+        isDark ? AppColorsDark.textPrimary : AppColorsLight.onPrimary;
+    final heartInactiveColor =
+        isDark ? AppColorsDark.textSecondary : AppColorsLight.textSecondary;
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
+        // AppBar minimaliste : retour uniquement, zone B vide, aucun titre
+        // (le modèle `Dua` n'en a pas — §A.2), aucun ♥ ici (§A.5).
         appBar: AppTopBar(
-          // Sans titre (§ Lecture : « AppBar sans titre : retour + ♥ »).
+          height: 52,
           leading: IconButton(
             icon: Icon(Icons.arrow_forward, color: appBarForeground),
             onPressed: () => Navigator.maybePop(context),
           ),
-          actions: [
-            IconButton(
-              icon: Icon(
-                _isFavorite ? Icons.favorite : Icons.favorite_border,
-                color: _isFavorite ? cs.error : appBarForeground,
-              ),
-              onPressed: _toggleFavorite,
-            ),
-          ],
         ),
-        body: FutureBuilder<Dua?>(
-          future: _futureDua,
+        body: FutureBuilder<({Dua? dua, bool isFavorite})>(
+          future: _future,
           builder: (context, snap) {
-            if (snap.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            final dua = snap.data;
-            if (dua == null) {
+            // Lecture locale, quelques millisecondes (§B.8) : aucun
+            // indicateur de chargement — un corps vide le temps d'un frame
+            // plutôt qu'un `CircularProgressIndicator` qui ne ferait que
+            // clignoter.
+            if (snap.connectionState != ConnectionState.done) {
               return const SizedBox.shrink();
             }
 
-            return Column(
-              children: [
-                Expanded(
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      // Centré verticalement si le texte tient ; défile
-                      // sinon (idiome standard Flutter : ConstrainedBox
-                      // avec minHeight = hauteur du viewport, à l'intérieur
-                      // d'un SingleChildScrollView).
-                      return SingleChildScrollView(
-                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                          child: Center(
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 340),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    dua.text,
-                                    textAlign: TextAlign.center,
-                                    textDirection: TextDirection.rtl,
-                                    style: AppTypography.duaBody.copyWith(color: cs.onSurface),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
-        bottomNavigationBar: FutureBuilder<Dua?>(
-          future: _futureDua,
-          builder: (context, snap) {
-            final dua = snap.data;
+            final dua = snap.data?.dua;
+            if (dua == null) {
+              return const AppEmptyState(
+                message: 'تعذّر العثور على هذا الدعاء.',
+              );
+            }
+
             return SafeArea(
               child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.lg),
-                child: Row(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    const SizedBox(height: AppSpacing.lg),
                     Expanded(
-                      child: AppButton(
-                        role: AppButtonRole.secondary,
-                        icon: Icons.copy,
-                        label: 'نسخ',
-                        onPressed: dua == null ? null : () => _copy(dua.text),
+                      child: AppCard(
+                        level: AppCardLevel.hero,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // Seul élément défilant de l'écran (§A.6) —
+                            // centré si le texte tient, défile sinon.
+                            // Aucun fade/blur/gradient : coupure nette au
+                            // bord de la carte (le `ClipRRect` d'`AppCard`
+                            // suffit à la border proprement).
+                            Expanded(
+                              child: LayoutBuilder(
+                                builder: (context, constraints) {
+                                  return SingleChildScrollView(
+                                    child: ConstrainedBox(
+                                      constraints: BoxConstraints(
+                                        minHeight: constraints.maxHeight,
+                                      ),
+                                      child: Center(
+                                        child: ConstrainedBox(
+                                          constraints:
+                                              const BoxConstraints(maxWidth: 340),
+                                          child: Text(
+                                            dua.text,
+                                            textAlign: TextAlign.center,
+                                            textDirection: TextDirection.rtl,
+                                            style: AppTypography.duaLong
+                                                .copyWith(color: cs.onSurface),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.md),
+                            // Pied de carte : ♥ seul, aligné en fin de ligne
+                            // (côté gauche en flux RTL) — §A.5.
+                            Row(
+                              textDirection: TextDirection.rtl,
+                              children: [
+                                const Spacer(),
+                                ScaleTransition(
+                                  scale: _heartScale,
+                                  child: SizedBox(
+                                    width: 48,
+                                    height: 48,
+                                    child: IconButton(
+                                      padding: EdgeInsets.zero,
+                                      onPressed: _toggleFavorite,
+                                      icon: Icon(
+                                        _isFavorite
+                                            ? Icons.favorite
+                                            : Icons.favorite_border,
+                                        size: 24,
+                                        color: _isFavorite
+                                            ? cs.error
+                                            : heartInactiveColor,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                    const SizedBox(width: AppSpacing.md),
-                    Expanded(
-                      child: AppButton(
-                        role: AppButtonRole.primary,
-                        icon: Icons.share,
-                        label: 'مشاركة',
-                        onPressed: dua == null ? null : () => _share(dua.text),
-                      ),
+                    const SizedBox(height: AppSpacing.md),
+                    Row(
+                      textDirection: TextDirection.rtl,
+                      children: [
+                        Expanded(
+                          child: AppButton(
+                            role: AppButtonRole.secondary,
+                            icon: Icons.copy,
+                            label: 'نسخ',
+                            onPressed: () => _copy(dua.text),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.md),
+                        Expanded(
+                          child: AppButton(
+                            role: AppButtonRole.primary,
+                            icon: Icons.share,
+                            label: 'مشاركة',
+                            onPressed: () => _share(dua.text),
+                          ),
+                        ),
+                      ],
                     ),
+                    const SizedBox(height: AppSpacing.lg),
                   ],
                 ),
               ),

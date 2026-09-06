@@ -78,7 +78,7 @@ class _SearchScreenState extends State<SearchScreen> {
       context,
       PageRouteBuilder(
         pageBuilder: (context, animation, secondaryAnimation) =>
-            DuaReadScreen(duaId: dua.id, origin: DuaReadOrigin.search),
+            DuaReadScreen(duaId: dua.id),
         transitionDuration: Duration(milliseconds: reduceMotion ? 150 : 300),
         reverseTransitionDuration: Duration(milliseconds: reduceMotion ? 150 : 300),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
@@ -98,8 +98,9 @@ class _SearchScreenState extends State<SearchScreen> {
     );
     // Recherche restaurée nativement par Flutter (le State de cet écran
     // n'est pas détruit par un push) : terme, résultats et défilement
-    // inchangés. Aucun ♥ affiché sur les résultats (§4) → rien à
-    // resynchroniser ici, contrairement à Favoris (LOT 3.C.2).
+    // inchangés. Aucun ♥ affiché sur les résultats (§4 Recherche) → rien à
+    // resynchroniser ici, contrairement à Favoris (LOT 3.I, dont les cartes
+    // portent un ♥).
   }
 
   @override

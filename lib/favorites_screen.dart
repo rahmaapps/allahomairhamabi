@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'dua_repository.dart';
 import 'models/dua.dart';
+import 'screens/dua_read_screen.dart';
 import 'user_prefs.dart';
 import 'theme/app_colors.dart';
 import 'theme/app_spacing.dart';
@@ -11,10 +12,12 @@ import 'widgets/app_dua_result_card.dart';
 import 'widgets/app_empty_state.dart';
 import 'widgets/app_snackbar.dart';
 
-/// Favoris — spécification close (docs/ui_ux/ETAT_CONSOLIDE_UI_UX.md, §4).
-/// AppBar h52, `المفضلة`, aucune icône d'action. Carte = `AppDuaResultCard`
-/// (identique à la future carte de résultat de recherche, ♥ en tête).
-/// Ordre : plus récemment ajouté en premier, non modifiable.
+/// Favoris — spécification close (docs/ui_ux/ETAT_CONSOLIDE_UI_UX.md, §4 ;
+/// navigation vers l'écran de lecture : LOT 3.I). AppBar h52, `المفضلة`,
+/// aucune icône d'action. Carte = `AppDuaResultCard` (identique à la carte
+/// de résultat de recherche, ♥ en tête). Ordre : plus récemment ajouté en
+/// premier, non modifiable. Tap sur le contenu → `DuaReadScreen` (même
+/// transition RTL que Recherche) ; le ♥ reste une cible indépendante.
 class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({super.key});
 
@@ -77,6 +80,39 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     setState(() {
       _futureFavs = Future.value(newList);
     });
+  }
+
+  /// Tap sur le contenu de la carte → `DuaReadScreen` (§B.2 LOT 3.I). Même
+  /// transition RTL que Recherche (300 ms `easeInOutCubic`, dupliquée
+  /// localement — même motif déjà en place dans le projet, aucune
+  /// constante/fonction partagée existante pour cette transition).
+  /// Resynchronise la liste au retour : un retrait de favori fait depuis
+  /// l'écran de lecture doit immédiatement disparaître de cette liste.
+  Future<void> _openReading(Dua dua) async {
+    final reduceMotion = MediaQuery.of(context).disableAnimations;
+
+    await Navigator.push(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            DuaReadScreen(duaId: dua.id),
+        transitionDuration: Duration(milliseconds: reduceMotion ? 150 : 300),
+        reverseTransitionDuration: Duration(milliseconds: reduceMotion ? 150 : 300),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          if (reduceMotion) {
+            return FadeTransition(opacity: animation, child: child);
+          }
+          final curved = CurvedAnimation(parent: animation, curve: Curves.easeInOutCubic);
+          return SlideTransition(
+            position: Tween<Offset>(begin: const Offset(-1, 0), end: Offset.zero)
+                .animate(curved),
+            child: child,
+          );
+        },
+      ),
+    );
+
+    await _refresh();
   }
 
   /// Retrait silencieux, jamais bloquant (§4) : suppression immédiate +
@@ -162,9 +198,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                       text: d.text,
                       showFavoriteHeart: true,
                       onFavoriteTap: () => _removeFavorite(context, d),
-                      // Pas de navigation : l'écran de lecture n'est pas
-                      // spécifié (§7) — la carte reste explicitement neutre
-                      // en dehors du ♥ (onTap volontairement omis).
+                      onTap: () => _openReading(d),
                     );
                   },
                 ),
