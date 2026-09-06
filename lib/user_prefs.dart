@@ -27,8 +27,9 @@ class UserPrefs {
   // -----------------------------
   // Switchs (nous conservons les clés existantes de ton fichier)
   static const _kEnableMorning = 'enableMorning';
-  static const _kEnableAfternoon = 'enableAfternoon';
   static const _kEnableEvening = 'enableEvening';
+  // LOT 3.G — تذكير الجمعة : switch seul, heure fixe non persistée (09:00).
+  static const _kEnableFriday = 'enableFriday';
 
   static Future<void> saveFavoriteText(int id, String text) async {
     final prefs = await SharedPreferences.getInstance();
@@ -40,13 +41,11 @@ class UserPrefs {
     return prefs.getString('fav_text_$id');
   }
 
-  // Heures/Horaires
+  // Heures/Horaires — LOT 3.G : seule تذكير الصباح garde une heure
+  // configurable et persistée (المساء et الجمعة sont fixes en dur, non
+  // persistées : 20:00 et 09:00, voir settings_screen.dart).
   static const _kMorningHour = 'morningHour';
   static const _kMorningMinute = 'morningMinute';
-  static const _kAfternoonHour = 'afternoonHour';
-  static const _kAfternoonMinute = 'afternoonMinute';
-  static const _kEveningHour = 'eveningHour';
-  static const _kEveningMinute = 'eveningMinute';
 
   // Filtre longueur
   static const _kLengthFilter = 'length_filter'; // (déjà utilisée)
@@ -70,16 +69,6 @@ class UserPrefs {
     await sp.setBool(_kEnableMorning, v);
   }
 
-  Future<bool> getAfternoonEnabled() async {
-    final sp = await _prefs();
-    return sp.getBool(_kEnableAfternoon) ?? true;
-  }
-
-  Future<void> setAfternoonEnabled(bool v) async {
-    final sp = await _prefs();
-    await sp.setBool(_kEnableAfternoon, v);
-  }
-
   Future<bool> getEveningEnabled() async {
     final sp = await _prefs();
     return sp.getBool(_kEnableEvening) ?? true;
@@ -90,12 +79,22 @@ class UserPrefs {
     await sp.setBool(_kEnableEvening, v);
   }
 
+  /// LOT 3.G — nouveau rappel, absent avant ce lot : défaut `false` pour ne
+  /// jamais activer silencieusement une notification supplémentaire chez un
+  /// utilisateur existant qui ne l'a jamais demandée.
+  Future<bool> getFridayEnabled() async {
+    final sp = await _prefs();
+    return sp.getBool(_kEnableFriday) ?? false;
+  }
+
+  Future<void> setFridayEnabled(bool v) async {
+    final sp = await _prefs();
+    await sp.setBool(_kEnableFriday, v);
+  }
+
   // ---- Alias backward-compat (ton ancien naming) ----
   Future<void> setEnableMorning(bool v) => setMorningEnabled(v);
   Future<bool> getEnableMorning() => getMorningEnabled();
-
-  Future<void> setEnableAfternoon(bool v) => setAfternoonEnabled(v);
-  Future<bool> getEnableAfternoon() => getAfternoonEnabled();
 
   Future<void> setEnableEvening(bool v) => setEveningEnabled(v);
   Future<bool> getEnableEvening() => getEveningEnabled();
@@ -113,32 +112,6 @@ class UserPrefs {
     final sp = await _prefs();
     final h = sp.getInt(_kMorningHour) ?? 9;
     final m = sp.getInt(_kMorningMinute) ?? 0;
-    return TimeOfDay(hour: h, minute: m);
-  }
-
-  Future<void> setAfternoonTime(TimeOfDay t) async {
-    final sp = await _prefs();
-    await sp.setInt(_kAfternoonHour, t.hour);
-    await sp.setInt(_kAfternoonMinute, t.minute);
-  }
-
-  Future<TimeOfDay> getAfternoonTime() async {
-    final sp = await _prefs();
-    final h = sp.getInt(_kAfternoonHour) ?? 15;
-    final m = sp.getInt(_kAfternoonMinute) ?? 0;
-    return TimeOfDay(hour: h, minute: m);
-  }
-
-  Future<void> setEveningTime(TimeOfDay t) async {
-    final sp = await _prefs();
-    await sp.setInt(_kEveningHour, t.hour);
-    await sp.setInt(_kEveningMinute, t.minute);
-  }
-
-  Future<TimeOfDay> getEveningTime() async {
-    final sp = await _prefs();
-    final h = sp.getInt(_kEveningHour) ?? 20;
-    final m = sp.getInt(_kEveningMinute) ?? 0;
     return TimeOfDay(hour: h, minute: m);
   }
 

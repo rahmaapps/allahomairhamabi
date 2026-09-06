@@ -9,13 +9,12 @@ import '../theme/app_spacing.dart';
 /// Niveaux de carte — Design System Phase 2 (§3 « Hiérarchie des cartes »,
 /// 4 niveaux N1-N4).
 ///
-/// `hero` (N1, la carte du douʿā) et `content` (N2, carte de contenu —
-/// Favoris/résultats de recherche) sont implémentés : ce sont les deux
-/// seuls niveaux concrètement requis à ce jour. N3 (groupes de réglages)
-/// et N4 (cartes discrètes) seront ajoutés avec les lots qui les
-/// consomment réellement (Paramètres...), pour éviter de deviner leur
-/// usage aujourd'hui.
-enum AppCardLevel { hero, content }
+/// `hero` (N1, la carte du douʿā), `content` (N2, carte de contenu —
+/// Favoris/résultats de recherche) et `settingsGroup` (N3, groupe de
+/// réglages — Paramètres, LOT 3.G) sont implémentés. N4 (cartes discrètes)
+/// sera ajouté avec le lot qui le consomme réellement, pour éviter de
+/// deviner son usage aujourd'hui.
+enum AppCardLevel { hero, content, settingsGroup }
 
 /// Carte N1 — `surface` · `r-hero` (24) · `e2` · padding 24 · filet d'or
 /// 2 px en tête · rosace 16 pointes en filigrane à 5,5 %. « Seule surface à
@@ -41,6 +40,8 @@ class AppCard extends StatelessWidget {
         return _HeroCard(child: child);
       case AppCardLevel.content:
         return _ContentCard(child: child);
+      case AppCardLevel.settingsGroup:
+        return _SettingsGroupCard(child: child);
     }
   }
 }
@@ -125,6 +126,32 @@ class _ContentCard extends StatelessWidget {
         padding: const EdgeInsets.all(AppSpacing.xl),
         child: child,
       ),
+    );
+  }
+}
+
+/// N3 — groupe de réglages (Paramètres, §4). `surfaceAlt` · `r-card` · `e0`
+/// (trait 1px) · **aucun padding propre** : les lignes et les séparateurs
+/// « 1 px pleine largeur, absents sur la dernière ligne » (§4) sont posés
+/// par l'appelant, afin que les traits touchent réellement les deux bords
+/// du groupe (contrairement à N3 générique du §3, indenté de 16).
+class _SettingsGroupCard extends StatelessWidget {
+  const _SettingsGroupCard({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        borderRadius: AppRadii.cardRadius,
+        border: Border.all(color: cs.outline, width: AppShadows.e0BorderWidth),
+      ),
+      child: child,
     );
   }
 }

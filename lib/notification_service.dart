@@ -22,8 +22,8 @@ class NotificationService {
 
   // IDs des canaux
   static const String channelMorning = 'channel_morning';
-  static const String channelAfternoon = 'channel_afternoon';
   static const String channelEvening = 'channel_evening';
+  static const String channelFriday = 'channel_friday';
 
   /// Initialisation (à appeler très tôt, ex: dans `main()`).
   ///
@@ -159,18 +159,18 @@ class NotificationService {
         showBadge: true,
       ),
       const AndroidNotificationChannel(
-        channelAfternoon,
-        'Rappels de l\'après‑midi',
-        description: 'Notifications planifiées pour la période de l\'après‑midi',
-        importance: Importance.high,
-        playSound: true,
-        showBadge: true,
-      ),
-      const AndroidNotificationChannel(
         channelEvening,
         'Rappels du soir',
         description: 'Notifications planifiées pour la période du soir',
         importance: Importance.defaultImportance,
+        playSound: true,
+        showBadge: true,
+      ),
+      const AndroidNotificationChannel(
+        channelFriday,
+        'Rappel du vendredi',
+        description: 'Notification hebdomadaire planifiée le vendredi',
+        importance: Importance.high,
         playSound: true,
         showBadge: true,
       ),
@@ -211,9 +211,9 @@ class NotificationService {
     await _plugin.show(notificationId, title, body, details, payload: payload);
   }
 
-  /// Helper : rappel par période (matin / après‑midi / soir)
+  /// Helper : rappel par période (matin / soir / vendredi)
   Future<void> showPeriodReminder({
-    required String periodId, // 'period_morning' | 'period_afternoon' | 'period_evening'
+    required String periodId, // 'period_morning' | 'period_evening' | 'period_friday'
     required int hour,
     required int minute,
   }) async {
@@ -230,11 +230,11 @@ class NotificationService {
         body  = '🤲 ﴿وَقُل رَّبِّ ارْحَمْهُمَا كَمَا رَبَّيَانِي صَغِيرًا﴾';
         break;
 
-      case 'period_afternoon':
-        channelId = channelAfternoon;
-        notiId = 102;
-        title = '🕊️ اذكر والدك بدعوة صادقة';
-        body  = '📿 «أو ولدٌ صالحٌ يدعو له»';
+      case 'period_friday':
+        channelId = channelFriday;
+        notiId = 104;
+        title = '🕌 يوم الجمعة مبارك';
+        body  = '🤲 أكثر من الدعاء لوالدك في هذا اليوم المبارك';
         break;
 
       case 'period_evening':

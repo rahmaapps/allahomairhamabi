@@ -37,6 +37,15 @@ Future<void> main() async {
   final favoritesWereReset =
       await UserPrefs.migrateFavoritesToGlobalIdsIfNeeded();
 
+  // LOT 3.G — نettoyage global de l'ancienne tâche WorkManager « بعد الظهر »
+  // (supprimée du produit). Exécuté ici, au démarrage réel de l'app, et non
+  // plus seulement dans SettingsScreen._bootstrap() : un utilisateur qui
+  // avait ce rappel actif et qui n'ouvre plus jamais l'écran Paramètres
+  // continuait sinon à recevoir cette notification indéfiniment. Idempotent
+  // (no-op si la tâche n'existe pas) — sans risque à exécuter à chaque
+  // lancement.
+  await WorkManagerService.cancel(WorkIds.legacyAfternoon);
+
   // Premier lancement → Onboarding dédié (LOT 3.E.1), plus SettingsScreen
   // (toujours accessible ensuite depuis HOME → ⋮ → « الإعدادات », route
   // '/settings' conservée telle quelle pour cet accès).
