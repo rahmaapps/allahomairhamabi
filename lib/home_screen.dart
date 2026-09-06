@@ -7,22 +7,28 @@ import 'package:flutter/services.dart'; // Clipboard + Haptics
 import 'package:flutter/rendering.dart'; // RenderRepaintBoundary
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:in_app_review/in_app_review.dart';
 
 import 'dua_repository.dart';
 import 'models/dua.dart';
-import 'models/person_type.dart';
 import 'user_prefs.dart';
 import 'settings_screen.dart';
 import 'favorites_screen.dart';
 import 'search_screen.dart';
 import 'screens/person_selection_screen.dart';
-import 'widgets/islamic_pattern_painter.dart';
-import 'widgets/islamic_bg_motif_painter.dart';
+import 'screens/grave_visit_read_screen.dart';
 import 'premium_templates.dart';
 import 'widgets/premium_export_card.dart';
 import 'dua_personalizer.dart';
+import 'theme/app_colors.dart';
+import 'theme/app_radii.dart';
+import 'theme/app_spacing.dart';
+import 'theme/app_typography.dart';
+import 'widgets/app_bar.dart';
+import 'widgets/app_button.dart';
+import 'widgets/app_card.dart';
+import 'widgets/app_chip.dart';
+import 'widgets/app_empty_state.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -39,11 +45,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   int? _currentId;
   bool _isFavorite = false;
 
-  bool get isGraveVisit => _activeCategory == 'grave_visit';
-
   //Suffixe des textes copiés ou partagés
   static const String _ATTR_SUFFIX_AR =
-      '\n\n— من تطبيق اللَّهُمَّ ارْحَمْ أَبِي —';
+      '\n\n— من تطبيق اللَّهُمَّ ارْحَمْ أَبِي —';
 
   // Lien public de l'application (remplace par l'URL finale Play Store / AppGallery / site)
   static const String _APP_LINK =
@@ -54,11 +58,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       'شارك الأجر – أرسل التطبيق لأهلك:\n$_APP_LINK';
 
   // ===== Filtres =====
-  String _activeCategory = 'normal'; // 'normal' | 'friday' | 'grave_visit'
+  // زيارة القبر a son propre écran dédié (LOT 3.F) — plus jamais atteint via
+  // _activeCategory (ancien pont supprimé).
+  String _activeCategory = 'normal'; // 'normal' | 'friday'
   String _lengthFilter = 'all'; // 'all' | 'short' | 'long'
-
-  PersonType selectedPerson =
-      PersonType.father; //variables dédié à la selection des personnes
 
   // ===== Deck anti-répétition =====
   final List<int> _deckIds = <int>[];
@@ -70,15 +73,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late final Animation<Offset> _slide;
   late final AnimationController _heartCtrl;
 
-  // ===== Capture image (Option A – gradient inline, désactivée côté bouton) =====
-  final GlobalKey _imageKey = GlobalKey();
-
   // ===== Export Premium (carte-image partageable du dou'a affiché) =====
   // Une seule clé : décision produit V1.2 — toujours EXACTEMENT une image
   // partagée, quelle que soit la longueur du dou'a. PremiumExportCard
   // restreint elle-même le rendu Dark Luxe paginé à sa première page.
   final GlobalKey _exportKey = GlobalKey();
   PremiumTemplate _selectedTemplate = PremiumTemplate.darkLuxe;
+
+  // Espace réservé en bas de la carte pour le pied (♡ + « دعاء آخر ») :
+  // hauteur de AppButton (48, fixe — §3) + un espacement de respiration.
+  // La zone de texte défilant s'arrête au-dessus, jamais derrière.
+  static const double _cardFooterReservedHeight = 56;
 
   @override
   void initState() {
@@ -113,6 +118,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // CHARGEMENT INITIAL
   // ===========================================================================
 
+  // Mécanisme d'évaluation prévu au MVP — conservé pour une intégration
+  // dédiée ultérieure (non supprimé, décision produit antérieure à ce lot).
   Future<void> _rateApp() async {
     final InAppReview inAppReview = InAppReview.instance;
     if (await inAppReview.isAvailable()) {
@@ -140,8 +147,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Future<void> _loadInitial() async {
     await _refreshLengthFilter();
 
-    // ✅ définir catégorie par défaut
-    _activeCategory ??= 'normal';
     personsData = await UserPrefs.getPersonsData();
 
 
@@ -178,10 +183,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   // ===========================================================================
-  // RECONSTRUIRE LE DECK (longueur + catégorie) AVEC FALLBACK “all”
-  // ===========================================================================
-
-  // ===========================================================================
   // TIRAGE ALÉATOIRE (respecte la cat ; fallback “all”)
   Future<void> _loadRandomDua({bool ignoreCategory = false}) async {
     await _refreshLengthFilter();
@@ -189,10 +190,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     try {
       // ✅ Charger le JSON complet
       final data = await _repo.getFullJson();
-      // ⚠️ (si tu n’as pas cette méthode encore, on l’ajoutera après)
 
       // ✅ choisir une personne d'abord
-
       final persons = personsData.isEmpty
           ? ['general']   // ✅ FORCER GENERAL
           : personsData.keys.toList();
@@ -230,7 +229,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _anim.forward(from: 0);
 
     } catch (e) {
-      print("❌ ERREUR: $e");
+      debugPrint("❌ ERREUR: $e");
 
       _currentDuaText = "حدث خطأ أثناء تحميل الدعاء";
       if (mounted) setState(() {});
@@ -318,48 +317,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   // ===========================================================================
-  // Partage en image : désactivé pour cette version (message “bientôt”)
-  // ===========================================================================
-  void _shareImageSoon() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content:
-            Text('ميزة مشاركة الدعاء كصورة ستكون جاهزة قريباً إن شاء الله'),
-        duration: Duration(seconds: 2),
-      ),
-    );
-  }
-
-  // (si tu veux garder la capture prête)
-  Future<Uint8List?> _captureImage() async {
-    try {
-      await WidgetsBinding.instance.endOfFrame;
-      final ctx = _imageKey.currentContext;
-      if (ctx == null) return null;
-      final ro = ctx.findRenderObject();
-      if (ro is! RenderRepaintBoundary) return null;
-
-      int tries = 0;
-      while (ro.debugNeedsPaint && tries < 5) {
-        await Future.delayed(const Duration(milliseconds: 16));
-        await WidgetsBinding.instance.endOfFrame;
-        tries++;
-      }
-
-      final ui.Image image = await ro.toImage(pixelRatio: 3.0);
-      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-      return byteData?.buffer.asUint8List();
-    } catch (e, st) {
-      debugPrint('Erreur capture: $e\n$st');
-      return null;
-    }
-  }
-
-  // ===========================================================================
   // Export Premium : capture du RepaintBoundary (_exportKey) → PNG → partage
   // Toujours EXACTEMENT une image (décision produit V1.2), quelle que soit
-  // la longueur du dou'a. Même patron de capture/retry que _captureImage()
-  // ci-dessus.
+  // la longueur du dou'a.
   // ===========================================================================
   Future<Uint8List?> _renderPremiumPng() async {
     try {
@@ -371,7 +331,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
       // La fermeture animée du bottom sheet peut laisser le repaint en
       // attente sur plusieurs frames : un seul endOfFrame ne suffit pas
-      // toujours. Même patron de retry borné que _captureImage() ci-dessus.
+      // toujours. Retry borné.
       int tries = 0;
       while (boundary.debugNeedsPaint && tries < 5) {
         await Future.delayed(const Duration(milliseconds: 16));
@@ -397,67 +357,175 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     ]);
   }
 
+  // Bottom sheet Partage Premium — 3 vignettes 74×104, poids strictement
+  // égal, ordre RTL Dark Luxe → Emerald → White (§4 Partage Premium).
+  // Sélection = 3 signaux simultanés : anneau 2px, pastille ✓, libellé 600.
   void _openTemplatePicker() {
+    final cs = Theme.of(context).colorScheme;
+
     showModalBottomSheet(
       context: context,
       useSafeArea: true,
       showDragHandle: true,
-      builder: (context) {
-        final items = PremiumTemplate.values;
-
-        return GridView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: items.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3,
-            mainAxisSpacing: 16,
-            crossAxisSpacing: 16,
-            childAspectRatio: 0.75,
+      backgroundColor: cs.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadii.hero)),
+      ),
+      builder: (sheetContext) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.xl,
+            AppSpacing.md,
+            AppSpacing.xl,
+            AppSpacing.xxl,
           ),
-          itemBuilder: (_, index) {
-            final t = items[index];
-            final selected = t == _selectedTemplate;
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            textDirection: TextDirection.rtl,
+            children: PremiumTemplate.values.map((t) {
+              final selected = t == _selectedTemplate;
 
-            return InkWell(
-              onTap: () {
-                setState(() => _selectedTemplate = t);
-                Navigator.pop(context);
-                _sharePremiumImage();
-              },
-              child: Stack(
-                alignment: Alignment.bottomCenter,
-                children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(14),
-                      image: DecorationImage(
-                        image: AssetImage(t.thumbAsset),
-                        fit: BoxFit.cover,
-                      ),
-                      border: Border.all(
-                        width: 2,
-                        color: selected
-                            ? Theme.of(context).colorScheme.primary
-                            : Colors.transparent,
-                      ),
+              return GestureDetector(
+                onTap: () {
+                  setState(() => _selectedTemplate = t);
+                  Navigator.pop(sheetContext);
+                  _sharePremiumImage();
+                },
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Container(
+                          width: 74,
+                          height: 104,
+                          decoration: BoxDecoration(
+                            borderRadius: AppRadii.cardRadius,
+                            image: DecorationImage(
+                              image: AssetImage(t.thumbAsset),
+                              fit: BoxFit.cover,
+                            ),
+                            border: Border.all(
+                              width: selected ? 2 : 1,
+                              color: selected ? cs.primary : cs.outline,
+                            ),
+                          ),
+                        ),
+                        if (selected)
+                          Positioned(
+                            top: -6,
+                            right: -6,
+                            child: Icon(Icons.check_circle,
+                                color: cs.primary, size: 18),
+                          ),
+                      ],
                     ),
-                  ),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.black45,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    margin: const EdgeInsets.all(8),
-                    child: Text(
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
                       t.displayName,
-                      style: const TextStyle(color: Colors.white),
+                      textDirection: TextDirection.rtl,
+                      style: AppTypography.label.copyWith(
+                        color: cs.onSurface,
+                        fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            );
-          },
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+        );
+      },
+    );
+  }
+
+  // Bottom sheet دعاء زيارة القبر — choix explicite de la personne avant la
+  // lecture (LOT 3.F). Réutilise exactement le motif déjà en place pour
+  // Partage Premium (_openTemplatePicker) : showModalBottomSheet +
+  // useSafeArea + showDragHandle + coin haut r-hero. Options strictement
+  // limitées aux personnes déjà configurées (`personsData.keys`), jamais
+  // les 11 `PersonType.values`. Aucune persistance, aucun champ prénom,
+  // aucune multi-sélection, aucun badge `الحالي`, aucune snackbar — un tap
+  // ferme la feuille et ouvre directement l'écran de lecture.
+  void _openGraveVisitPersonPicker() {
+    final cs = Theme.of(context).colorScheme;
+
+    showModalBottomSheet(
+      context: context,
+      useSafeArea: true,
+      showDragHandle: true,
+      backgroundColor: cs.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadii.hero)),
+      ),
+      builder: (sheetContext) {
+        // Aucune personne configurée : gabarit d'état vide existant
+        // (`AppEmptyState`), jamais un nouvel état inventé (§3 « Composants
+        // communs »). Le bandeau HOME reste visible dans tous les cas —
+        // seul le contenu de la feuille change.
+        if (personsData.isEmpty) {
+          return SizedBox(
+            height: 340,
+            child: AppEmptyState(
+              message: 'اختر الشخص الذي تريد قراءة الدعاء عند زيارة قبره',
+              helper: 'لم تختر شخصًا بعد',
+              buttonLabel: 'اختيار شخص',
+              onButtonPressed: () async {
+                Navigator.pop(sheetContext);
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const PersonSelectionScreen()),
+                );
+                // Retour normal au HOME depuis Person Selection — aucune
+                // ouverture automatique de l'écran de lecture (LOT 3.F).
+                // Recharge personsData (même correctif que
+                // `_openPersonSelection`) : sans cela, une réouverture
+                // immédiate de دعاء زيارة القبر retrouvait l'ancien
+                // `personsData` en mémoire et réaffichait l'état vide malgré
+                // la personne qui vient d'être cochée (anomalie constatée
+                // en test manuel).
+                final newPersonsData = await UserPrefs.getPersonsData();
+                if (!mounted) return;
+                setState(() => personsData = newPersonsData);
+              },
+            ),
+          );
+        }
+
+        // `MediaQuery.viewPaddingOf` (jamais réduit par un `SafeArea`
+        // ancêtre, contrairement à `.padding`) : garantit que la dernière
+        // chip reste entièrement visible au-dessus de la barre de
+        // navigation système, quel que soit le comportement réel de
+        // `useSafeArea` sur l'appareil (anomalie constatée en test manuel).
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            AppSpacing.xl,
+            AppSpacing.md,
+            AppSpacing.xl,
+            AppSpacing.xxl + MediaQuery.viewPaddingOf(sheetContext).bottom,
+          ),
+          child: Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            alignment: WrapAlignment.center,
+            children: personsData.keys.map((key) {
+              return AppChip(
+                variant: AppChipVariant.person,
+                label: _possessivePersonLabel(key),
+                selected: false,
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => GraveVisitReadScreen(personKey: key),
+                    ),
+                  );
+                },
+              );
+            }).toList(),
+          ),
         );
       },
     );
@@ -466,7 +534,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Future<void> _rebuildDeckFiltered({int? excludeId}) async {
 
     // ✅ DEBUG ICI (1ère ligne)
-    print("INSIDE rebuild personsData: $personsData");
+    debugPrint("INSIDE rebuild personsData: $personsData");
 
     await _refreshLengthFilter();
 
@@ -498,7 +566,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Future<void> _showNextFromDeck() async {
 
     if (personsData.isEmpty) {
-      print("⚠️ force rebuild (no persons)");
+      debugPrint("⚠️ force rebuild (no persons)");
       _deckIds.clear();
     }
     // recréer deck si vide
@@ -522,7 +590,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     final d = await _repo.getById(id);
     if (d == null) {
-      print("⚠️ Aucun douaa trouvé !");
+      debugPrint("⚠️ Aucun douaa trouvé !");
       await _loadRandomDua(ignoreCategory: true);
       return;
     }
@@ -537,6 +605,259 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   // ===========================================================================
+  // Sélection des personnes — ligne compacte (§2 décision #2 : « une ligne
+  // de 20 dp, pas un bouton »). Callback de retour préservé à l'identique :
+  // recharge personsData, réinitialise le deck, le reconstruit, puis montre
+  // un dou'a cohérent avec la nouvelle sélection.
+  // ===========================================================================
+  Future<void> _openPersonSelection() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const PersonSelectionScreen()),
+    );
+    final newPersonsData = await UserPrefs.getPersonsData();
+
+    setState(() {
+      personsData = newPersonsData;
+      _deckIds.clear();
+      _deckCursor = 0;
+    });
+
+    await _rebuildDeckFiltered(excludeId: _currentId);
+
+    if (_deckIds.isNotEmpty) {
+      await _showNextFromDeck();
+    } else {
+      await _loadRandomDua();
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // Favoris — au retour de l'écran Favoris, le douʿā affiché sur HOME n'a
+  // pas forcément changé mais son état favori a pu être modifié depuis
+  // Favoris (retrait via ♥). Relit l'état réel persisté pour CE douʿā
+  // précis (UserPrefs.instance.isFavorite, déjà utilisé partout ailleurs
+  // dans ce fichier) plutôt que de supposer que ♥ est resté vrai.
+  // ---------------------------------------------------------------------
+  Future<void> _openFavorites() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const FavoritesScreen()),
+    );
+    if (!mounted || _currentId == null) return;
+
+    final isFav = await UserPrefs.instance.isFavorite(_currentId!);
+    if (mounted) setState(() => _isFavorite = isFav);
+  }
+
+  /// Libellés possessifs déjà établis (`أبي`, `أمي`...) — repris tels
+  /// quels, identiques à ceux de Person Selection, non redécidés ici.
+  String _possessivePersonLabel(String personKey) {
+    switch (personKey) {
+      case 'father':
+        return 'أبي';
+      case 'mother':
+        return 'أمي';
+      case 'parents':
+        return 'والديّ';
+      case 'grandfather':
+        return 'جدي';
+      case 'grandmother':
+        return 'جدتي';
+      case 'brother':
+        return 'أخي';
+      case 'sister':
+        return 'أختي';
+      case 'son':
+        return 'ابني';
+      case 'daughter':
+        return 'ابنتي';
+      case 'husband':
+        return 'زوجي';
+      case 'wife':
+        return 'زوجتي';
+      default:
+        return personKey;
+    }
+  }
+
+  Widget _buildPersonsLine(ColorScheme cs, bool isDark) {
+    final hasPersons = personsData.isNotEmpty;
+    final String summary = !hasPersons
+        ? 'ادعُ لمن تحب'
+        : personsData.length == 1
+            ? 'تدعو لـ ${_possessivePersonLabel(personsData.keys.first)}'
+            : 'تدعو لـ ${personsData.length} أشخاص';
+    final String action = hasPersons ? 'تغيير' : 'اختيار';
+    final goldText = isDark ? AppColorsDark.gold : AppColorsLight.goldText;
+
+    // Pas de hauteur fixe (auparavant SizedBox(height: 20)) : la hauteur de
+    // ligne réelle de AppTypography.body/bodyStrong à 15px (~22-26dp selon
+    // le facteur `height`) dépasse 20dp et rognait verticalement le texte
+    // arabe (glyphes déformés). La ligne se dimensionne désormais à son
+    // contenu ; les espacements 12dp au-dessus/en dessous (déjà en place
+    // dans build()) portent le rythme vertical, pas une hauteur imposée ici.
+    return Row(
+      textDirection: TextDirection.rtl,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(
+          summary,
+          textDirection: TextDirection.rtl,
+          style: AppTypography.body.copyWith(color: cs.onSurface),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        GestureDetector(
+          onTap: _openPersonSelection,
+          child: Text(
+            action,
+            textDirection: TextDirection.rtl,
+            style: AppTypography.bodyStrong.copyWith(color: goldText),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFavoriteButton(ColorScheme cs, bool isDark) {
+    return ScaleTransition(
+      scale: _heartCtrl,
+      child: InkWell(
+        borderRadius: AppRadii.pillRadius,
+        onTap: () async {
+          if (_currentId == null) return;
+          HapticFeedback.selectionClick();
+          _heartCtrl.forward().then((_) => _heartCtrl.reverse());
+
+          await UserPrefs.instance.toggleFavorite(_currentId!);
+          if (_isFavorite) {
+            await UserPrefs.saveFavoriteText(_currentId!, _currentDuaText);
+          }
+
+          _isFavorite = await UserPrefs.instance.isFavorite(_currentId!);
+          if (mounted) setState(() {});
+        },
+        child: Container(
+          padding: const EdgeInsets.all(AppSpacing.sm),
+          decoration: BoxDecoration(
+            color: cs.surface.withValues(alpha: isDark ? 0.85 : 0.92),
+            borderRadius: AppRadii.pillRadius,
+          ),
+          child: Icon(
+            _isFavorite ? Icons.favorite : Icons.favorite_border,
+            color: _isFavorite ? cs.error : cs.onSurface.withValues(alpha: 0.7),
+            size: 26,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Douʿā défilant à l'intérieur de la carte HOME — dégradé de fondu 44 px
+  /// en haut/bas du contenu défilant (§2 « Douʿā long : défile à
+  /// l'intérieur de la carte, dégradé de bord 44 px »). Construit
+  /// localement à HOME (le scroll n'est pas dans `AppCard`, composant
+  /// partagé non touché — voir rapport d'audit) : même technique que
+  /// `GraveVisitReadScreen._FadingDuaText` (`ShaderMask` + `LinearGradient`
+  /// 4 arrêts), reprise ici sans en faire un composant partagé.
+  Widget _fadingDuaScroll(ColorScheme cs) {
+    const fadeHeight = 44.0;
+    return ShaderMask(
+      blendMode: BlendMode.dstIn,
+      shaderCallback: (rect) {
+        final fadeFraction =
+            rect.height > 0 ? (fadeHeight / rect.height).clamp(0.0, 0.5) : 0.0;
+        return LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: const [Colors.transparent, Colors.black, Colors.black, Colors.transparent],
+          stops: [0, fadeFraction, 1 - fadeFraction, 1],
+        ).createShader(rect);
+      },
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        child: Text(
+          _currentDuaText,
+          textAlign: TextAlign.center,
+          textDirection: TextDirection.rtl,
+          style: AppTypography.duaBody.copyWith(color: cs.onSurface),
+        ),
+      ),
+    );
+  }
+
+  // Chrome interne d'un AppButton (§ widgets/app_button.dart) : padding
+  // horizontal AppSpacing.xl de chaque côté (40) + icône 20 px + espace
+  // AppSpacing.sm (8) avant le libellé = 68 px ne portant jamais de texte.
+  static const double _kActionButtonChrome = 68;
+
+  /// نسخ / مشاركة — paire horizontale par défaut ; bascule verticale si la
+  /// largeur par action passe sous 132 dp, si le texte est agrandi
+  /// (`textScaler` ≥ 1,3), ou si un libellé risque d'être tronqué à la
+  /// largeur réellement mesurée (§2 « Comportement des catégories et des
+  /// actions »). Règle vérifiée par mesure réelle (`TextPainter`), jamais
+  /// par un point de rupture inventé. Réutilise `AppButton` tel quel.
+  Widget _buildCopyShareActions() {
+    final copyButton = AppButton(
+      role: AppButtonRole.action,
+      icon: Icons.copy,
+      label: 'نسخ',
+      onPressed: _copyDua,
+    );
+    final shareButton = AppButton(
+      role: AppButtonRole.action,
+      icon: Icons.share,
+      label: 'مشاركة',
+      onPressed: _shareDuaText,
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final widthPerAction = (constraints.maxWidth - AppSpacing.md) / 2;
+        final textScaler = MediaQuery.textScalerOf(context);
+        final scaledButtonFontSize = textScaler.scale(AppTypography.button.fontSize!);
+        final textScalerTooLarge =
+            scaledButtonFontSize >= AppTypography.button.fontSize! * 1.3;
+
+        final availableTextWidth = widthPerAction - _kActionButtonChrome;
+        bool wouldTruncate(String label) {
+          final painter = TextPainter(
+            text: TextSpan(text: label, style: AppTypography.button),
+            textDirection: TextDirection.rtl,
+            textScaler: textScaler,
+            maxLines: 1,
+          )..layout();
+          return painter.width > availableTextWidth;
+        }
+
+        final needsVertical = widthPerAction < 132 ||
+            textScalerTooLarge ||
+            wouldTruncate('نسخ') ||
+            wouldTruncate('مشاركة');
+
+        if (needsVertical) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              copyButton,
+              const SizedBox(height: AppSpacing.md),
+              shareButton,
+            ],
+          );
+        }
+
+        return Row(
+          children: [
+            Expanded(child: copyButton),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(child: shareButton),
+          ],
+        );
+      },
+    );
+  }
+
+  // ===========================================================================
   // BUILD
   // ===========================================================================
   @override
@@ -545,699 +866,164 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
 
+    // Couleur du texte/icônes de l'AppBar — jamais `cs.onPrimary` (pensé
+    // pour du texte sur l'accent `primary`, quasi noir en Dark Mode et donc
+    // illisible sur le fond réel `appBar`, également quasi noir en Dark).
+    // Même lecture que celle déjà retenue pour AppVisitBandeau : ivoire fixe
+    // par mode, alignée sur les tokens `onPrimary`(Light)/`textPrimary`(Dark)
+    // déjà utilisés par AppBarTheme lui-même (LOT 1A).
+    final appBarForeground = isDark ? AppColorsDark.textPrimary : AppColorsLight.onPrimary;
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Stack(
         children: [
-          // ---- RepaintBoundary invisible (image export) - Option A ----
-          IgnorePointer(
-            child: Opacity(
-              opacity: 0.01,
-              child: Center(
-                child: RepaintBoundary(
-                  key: _imageKey,
-                  child: SizedBox(
-                    width: 1080,
-                    height: 1350,
-                    child: Container(
-                      padding: const EdgeInsets.all(50),
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Color(0xFF0A0F14), Color(0xFF1F4037)],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
+          Scaffold(
+            appBar: AppTopBar(
+              title: 'اللَّهُمَّ ارْحَمْ أَبِي',
+              height: 56,
+              titleStyle:
+                  AppTypography.display.copyWith(fontSize: 25, color: appBarForeground),
+              actions: [
+                IconButton(
+                  tooltip: 'البحث',
+                  icon: Icon(Icons.search, color: appBarForeground),
+                  onPressed: () => Navigator.push(
+                      context, MaterialPageRoute(builder: (_) => const SearchScreen())),
+                ),
+                IconButton(
+                  tooltip: 'المفضلة',
+                  icon: Icon(Icons.favorite_border, color: appBarForeground),
+                  onPressed: _openFavorites,
+                ),
+                // ⤴ Partage Premium : rendue seulement si un douʿā est
+                // réellement affiché (§4 Partage Premium — « si aucun douʿā
+                // n'est affiché, l'icône n'est pas rendue — jamais grisée »).
+                // Absente du tableau `actions`, pas seulement désactivée.
+                if (_currentId != null)
+                  IconButton(
+                    tooltip: 'مشاركة كصورة',
+                    icon: Icon(Icons.ios_share, color: appBarForeground),
+                    onPressed: _openTemplatePicker,
+                  ),
+                // ⋮ → الإعدادات directement (§1 carte de navigation :
+                // « ⋮ → الإعدادات → Personnes / heure / thème / عن التطبيق »).
+                // Aucun menu intermédiaire : pas de destination inventée ici.
+                IconButton(
+                  tooltip: 'الإعدادات',
+                  icon: Icon(Icons.more_vert, color: appBarForeground),
+                  onPressed: () => Navigator.push(
+                      context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
+                ),
+              ],
+              bandeau: AppVisitBandeau(
+                label: 'دعاء زيارة القبر',
+                subtitle: 'للقراءة عند الزيارة',
+                onTap: _openGraveVisitPersonPicker,
+              ),
+            ),
+            body: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.xl,
+                  AppSpacing.lg,
+                  AppSpacing.xl,
+                  AppSpacing.lg,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // ---- Chips catégories (2, 50% chacune) ----
+                    Row(
+                      children: [
+                        Expanded(
+                          child: AppChip(
+                            label: 'عام',
+                            selected: _activeCategory == 'normal',
+                            onTap: () => _setCategory('normal'),
+                          ),
                         ),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            _currentDuaText,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontFamily: 'Lateef',
-                              fontSize: 58,
-                              color: Colors.white,
-                              height: 1.7,
+                        // Gap chips : le document indique 10 (§3
+                        // Espacements) mais l'échelle base-4 qu'il fixe au
+                        // même paragraphe l'exclut explicitement (« aucune
+                        // autre valeur ... pas de 6, 10, 14, 18 »).
+                        // Contradiction interne au document — signalée dans
+                        // le rapport, valeur d'échelle la plus proche
+                        // retenue (8) plutôt qu'un 10 hors échelle.
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: AppChip(
+                            label: 'دعاء الجمعة',
+                            selected: _activeCategory == 'friday',
+                            onTap: () => _setCategory('friday'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+
+                    // ---- Ligne « pour qui » (20dp, pas un bouton) ----
+                    _buildPersonsLine(cs, isDark),
+                    const SizedBox(height: AppSpacing.md),
+
+                    // ---- Carte du douʿā (N1) ----
+                    Expanded(
+                      child: SlideTransition(
+                        position: _slide,
+                        child: FadeTransition(
+                          opacity: _fade,
+                          child: AppCard(
+                            child: Stack(
+                              children: [
+                                // Zone de texte contrainte pour exclure
+                                // structurellement la bande du pied de carte
+                                // (♡ + « دعاء آخر ») : à largeur/hauteur
+                                // réduites, un douʿā long ne peut plus
+                                // passer derrière le bouton, quelle que soit
+                                // sa longueur — plutôt qu'un simple
+                                // chevauchement laissé au hasard du Center.
+                                Positioned.fill(
+                                  bottom: _cardFooterReservedHeight,
+                                  child: Center(
+                                    child: _fadingDuaScroll(cs),
+                                  ),
+                                ),
+
+                                // Pied de carte : ♡ + « دعاء آخر » — RTL
+                                // naturel (aucun TextDirection.ltr forcé).
+                                Positioned(
+                                  left: 0,
+                                  right: 0,
+                                  bottom: 0,
+                                  child: Row(
+                                    textDirection: TextDirection.rtl,
+                                    children: [
+                                      _buildFavoriteButton(cs, isDark),
+                                      const Spacer(),
+                                      AppButton(
+                                        role: AppButtonRole.secondary,
+                                        icon: Icons.skip_next_rounded,
+                                        label: 'دعاء آخر',
+                                        onPressed: _showNextFromDeck,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(height: 50),
-                          const Text(
-                            '— من تطبيق اللَّهُمَّ ارْحَمْ أَبِي —',
-                            style:
-                                TextStyle(color: Colors.white70, fontSize: 28),
-                          ),
-                        ],
+                        ),
                       ),
                     ),
-                  ),
+                    const SizedBox(height: AppSpacing.md),
+
+                    // ---- نسخ / مشاركة (paire, largeurs égales par défaut) ----
+                    _buildCopyShareActions(),
+                  ],
                 ),
               ),
             ),
           ),
-
-// === ARRIÈRE‑PLAN GLOBAL : Dégradé vert + Motif islamique + Scaffold ===
-
-              // 1) Ton fond dégradé existant (inchangé)
-              Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Color(0xFF006A4E), // vert profond
-                      Color(0xFF009F6B), // vert moyen
-                      Color(0xFF25C4A5), // vert clair
-                    ],
-                  ),
-                ),
-              ),
-
-              // 2) Le motif islamique en filigrane (au-dessus du dégradé)
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: CustomPaint(
-                    painter: IslamicBgMotifPainter(
-// Valeurs “or un peu plus visible”
-                      // Tu peux affiner ensuite sans redémarrer (Hot Reload OK pour ces params)
-                      grid: 104,
-                      starRadius: 24,
-                      strokeOpacity: 0.2,
-                      fillOpacity: 0.07,
-                      strokeWidth: 1.1,
-                      phase: const Offset(28, 14),
-                      // ink: Color(0xFFB8860B), // (optionnel, déjà par défaut
-                    ),
-                  ),
-                ),
-              ),
-
-              Scaffold(
-                backgroundColor: Colors.transparent,
-                appBar: AppBar(
-                  title: const Text(
-                    'اللَّهُمَّ ارْحَمْ أَمْوَاتَنَا',
-                    textDirection: TextDirection.rtl,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontFamily: 'Lateef',
-                      color: Colors.white,
-                    ),
-                  ),
-                  backgroundColor: Colors.transparent,
-                  elevation: 0,
-                  centerTitle: true,
-                  actions: [
-                    IconButton(
-                      tooltip: 'تصدير الدعاء كصورة',
-                      icon: const Icon(Icons.image_outlined, color: Colors.white),
-                      onPressed: _openTemplatePicker,
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.favorite, color: Colors.white),
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => const FavoritesScreen()),
-                        );
-                      },
-                    ),
-                    PopupMenuButton<String>(
-                      icon: const Icon(Icons.more_vert, color: Colors.white),
-                      onSelected: (v) {
-                        if (v == 'search') {
-                          Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => const SearchScreen()));
-                        } else if (v == 'favorites') {
-                          Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => const FavoritesScreen()));
-                        } else if (v == 'settings') {
-                          Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => const SettingsScreen()));
-                        }
-                      },
-                      itemBuilder: (_) => const [
-                        PopupMenuItem(value: 'search', child: Text('البحث')),
-                        PopupMenuItem(
-                            value: 'favorites', child: Text('المفضلة')),
-                        PopupMenuItem(
-                            value: 'settings', child: Text('الإعدادات')),
-                      ],
-                    ),
-                  ],
-                ),
-                body: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      children: [
-                        // ---- Boutons catégories ----
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildCategoryButton(
-                                keyCat: 'normal',
-                                label: 'عام',
-                                isDark: isDark,
-                                cs: cs,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: _buildCategoryButton(
-                                keyCat: 'friday',
-                                label: 'دعاء الجمعة',
-                                isDark: isDark,
-                                cs: cs,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: _buildCategoryButton(
-                                keyCat: 'grave_visit',
-                                label: 'دعاء زيارة القبر',
-                                isDark: isDark,
-                                cs: cs,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const PersonSelectionScreen(),
-                                ),
-                              ).then((_) async {
-                                final newPersonsData = await UserPrefs.getPersonsData();
-
-                                // ✅ DEBUG
-                                print("personsData: $newPersonsData");
-
-                                // ✅ TRÈS IMPORTANT : mettre à jour le state + reset deck
-                                setState(() {
-                                  personsData = newPersonsData;
-
-                                  // 🔥 CRITIQUE : reset du deck
-                                  _deckIds.clear();
-                                  _deckCursor = 0;
-                                });
-
-                                // ✅ rebuild avec NOUVEAU state
-                                await _rebuildDeckFiltered(excludeId: _currentId);
-
-                                if (_deckIds.isNotEmpty) {
-                                  await _showNextFromDeck();
-                                } else {
-                                  await _loadRandomDua();
-                                }
-                              });
-                            },
-                            icon: const Icon(Icons.people_alt_rounded, size: 18),
-                            label: const Text(
-                              'اختيار الأشخاص الذين تريد الدعاء لهم',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontFamily: 'Lateef',
-                              ),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white.withOpacity(0.18),
-                              foregroundColor: Colors.white,
-
-                              side: BorderSide(
-                                color: const Color(0xFFD4AF37).withOpacity(0.7),
-                                width: 1.5,
-                              ),
-
-                              minimumSize: const Size(double.infinity, 36), // ✅ hauteur
-                              padding: const EdgeInsets.symmetric(vertical: 6),
-
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-
-                              elevation: 0,
-                            ),
-                          ),
-                        ),
-
-                        const SizedBox(height: 12),
-// 🧾 CARTE PRINCIPALE — Doré Luxe (motif islamique + dégradé satiné)
-// -----------------------------------------------------
-                        Expanded(
-                          child: SlideTransition(
-                            position: _slide,
-                            child: FadeTransition(
-                              opacity: _fade,
-                              child: Container(
-                                // Ombre externe (relief de la carte)
-                                decoration: const BoxDecoration(
-                                  boxShadow: [
-                                    BoxShadow(
-                                        color: Colors.black26,
-                                        blurRadius: 12,
-                                        offset: Offset(0, 4)),
-                                  ],
-                                ),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(18),
-                                  child: CustomPaint(
-                                    // Motif doré AU-DESSUS du contenu (toujours visible)
-
-                                    foregroundPainter:
-                                        IslamicGoldPatternPainter(
-                                      isDark: isDark,
-                                      onSurface: cs.onSurface,
-
-                                      // Moins visible
-                                      strokeOpacity: 0.10,
-                                      // ↓ trait
-                                      fillOpacity: 0.035,
-                                      // ↓ aplat
-
-                                      // Un peu plus espacé (moins dense)
-                                      cell: 104,
-                                      // 98–104 pour ton écran ; monte à 106 si tu veux encore plus d’air
-                                      starRadius: 20,
-
-                                      // Décalage (stagger)
-                                      phaseX: 22,
-                                      phaseY: 12,
-                                      rowStagger:
-                                          0.5, // 0.5 = décale d’une demi-cellule 1 ligne sur 2
-                                    ),
-
-                                    child: Container(
-                                      // Dégradé de fond : ivoire (clair) / verre dépoli (sombre)
-                                      decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          begin: Alignment.topCenter,
-                                          end: Alignment.bottomCenter,
-                                          colors: isDark
-                                              ? [
-                                                  Colors.white
-                                                      .withOpacity(0.07),
-                                                  Colors.white
-                                                      .withOpacity(0.05),
-                                                ]
-                                              : [
-                                                  const Color(0xFFFFFBF1)
-                                                      .withOpacity(
-                                                          0.98), // ivoire doux
-                                                  const Color(0xFFFFF6E7)
-                                                      .withOpacity(
-                                                          0.92), // ivoire satiné
-                                                ],
-                                        ),
-                                        // Liseré doré ultra discret
-                                        border: Border.all(
-                                          color: const Color(0xFFB8860B)
-                                              .withOpacity(
-                                                  isDark ? 0.20 : 0.15),
-                                          width: 1,
-                                        ),
-                                      ),
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(18),
-                                        child: Stack(
-                                          children: [
-                                            // --- Texte centré ---
-                                            Center(
-                                              child: isGraveVisit
-                                                  ? SizedBox(
-                                                      height:
-                                                          MediaQuery.of(context)
-                                                                  .size
-                                                                  .height *
-                                                              0.6,
-                                                      child:
-                                                          SingleChildScrollView(
-                                                        physics:
-                                                            const BouncingScrollPhysics(),
-                                                        child: Text(
-                                                          _currentDuaText,
-                                                          textAlign:
-                                                              TextAlign.center,
-                                                          style: TextStyle(
-                                                            fontFamily:
-                                                                'Lateef',
-                                                            fontSize: 32,
-                                                            height: 1.7,
-                                                            color: cs.onSurface,
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    )
-                                                  : SingleChildScrollView(
-                                                      physics:
-                                                          const BouncingScrollPhysics(),
-                                                      child: Text(
-                                                        _currentDuaText,
-                                                        textAlign:
-                                                            TextAlign.center,
-                                                        style: TextStyle(
-                                                          fontFamily: 'Lateef',
-                                                          fontSize: 32,
-                                                          height: 1.7,
-                                                          color: cs.onSurface,
-                                                        ),
-                                                      ),
-                                                    ),
-                                            ),
-
-                                            // --- Barre d’actions en bas (❤️ gauche, دعاء آخر droite) ---
-                                            if (!isGraveVisit)
-                                              Positioned(
-                                                left: 0,
-                                                right: 0,
-                                                bottom: 4,
-                                                child: Directionality(
-                                                  textDirection:
-                                                      TextDirection.ltr,
-                                                  child: Row(
-                                                    children: [
-                                                      // ❤️ → gauche
-                                                      ScaleTransition(
-                                                        scale: _heartCtrl,
-                                                        child: InkWell(
-                                                          onTap: () async {
-                                                            if (_currentId ==
-                                                                null) return;
-                                                            HapticFeedback
-                                                                .selectionClick();
-                                                            _heartCtrl
-                                                                .forward()
-                                                                .then((_) =>
-                                                                    _heartCtrl
-                                                                        .reverse());
-
-                                                            await UserPrefs
-                                                                .instance
-                                                                .toggleFavorite(
-                                                                    _currentId!);
-                                                            if (_isFavorite) {
-                                                              await UserPrefs
-                                                                  .saveFavoriteText(
-                                                                      _currentId!,
-                                                                      _currentDuaText);
-                                                            }
-
-                                                            _isFavorite =
-                                                                await UserPrefs
-                                                                    .instance
-                                                                    .isFavorite(
-                                                                        _currentId!);
-                                                            if (mounted)
-                                                              setState(() {});
-                                                          },
-                                                          borderRadius:
-                                                              BorderRadius
-                                                                  .circular(30),
-                                                          child: Container(
-                                                            padding:
-                                                                const EdgeInsets
-                                                                    .all(6),
-                                                            decoration:
-                                                                BoxDecoration(
-                                                              // pastille semi-transparente pour la lisibilité
-                                                              color: Theme.of(
-                                                                      context)
-                                                                  .cardColor
-                                                                  .withOpacity(
-                                                                      isDark
-                                                                          ? 0.85
-                                                                          : 0.92),
-                                                              borderRadius:
-                                                                  BorderRadius
-                                                                      .circular(
-                                                                          30),
-                                                              boxShadow: const [
-                                                                BoxShadow(
-                                                                  color: Colors
-                                                                      .black12,
-                                                                  blurRadius: 6,
-                                                                  offset:
-                                                                      Offset(
-                                                                          0, 2),
-                                                                ),
-                                                              ],
-                                                            ),
-                                                            child: Icon(
-                                                              _isFavorite
-                                                                  ? Icons
-                                                                      .favorite
-                                                                  : Icons
-                                                                      .favorite_border,
-                                                              color: _isFavorite
-                                                                  ? Colors
-                                                                      .redAccent
-                                                                  : cs.onSurface
-                                                                      .withOpacity(
-                                                                          0.7),
-                                                              size: 26,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ),
-
-                                                      const Spacer(),
-
-                                                      // "دعاء آخر" → droite (texte à gauche, icône à droite)
-                                                      OutlinedButton(
-                                                        onPressed:
-                                                            _showNextFromDeck,
-                                                        style: OutlinedButton
-                                                            .styleFrom(
-                                                          side: BorderSide(
-                                                            color: const Color(
-                                                                    0xFFB8860B)
-                                                                .withOpacity(
-                                                                    isDark
-                                                                        ? 0.45
-                                                                        : 0.35),
-                                                            // doré discret
-                                                            width: 1.8,
-                                                          ),
-                                                          backgroundColor: isDark
-                                                              ? cs.surface
-                                                                  .withOpacity(
-                                                                      0.06)
-                                                              : const Color(
-                                                                      0xFFFFF6E7)
-                                                                  .withOpacity(
-                                                                      0.60),
-                                                          foregroundColor:
-                                                              cs.onSurface,
-                                                          padding:
-                                                              const EdgeInsets
-                                                                  .symmetric(
-                                                                  vertical: 8,
-                                                                  horizontal:
-                                                                      24),
-                                                          shape:
-                                                              RoundedRectangleBorder(
-                                                            borderRadius:
-                                                                BorderRadius
-                                                                    .circular(
-                                                                        10),
-                                                          ),
-                                                        ),
-                                                        child: Row(
-                                                          mainAxisSize:
-                                                              MainAxisSize.min,
-                                                          children: const [
-                                                            Text('دعاء آخر',
-                                                                style: TextStyle(
-                                                                    fontFamily:
-                                                                        'Lateef',
-                                                                    fontSize:
-                                                                        24)),
-                                                            SizedBox(width: 8),
-                                                            Icon(Icons
-                                                                .skip_next_rounded),
-                                                          ],
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                              ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        const SizedBox(height: 12),
-
-                        // -----------------------------------------------------
-// RANGÉE COPIER / PARTAGER (texte) — même visuel que les boutons catégories
-// -----------------------------------------------------
-                        if (!isGraveVisit)
-                          Row(
-                            children: [
-                              // === COPIER ===
-                              Expanded(
-                                child: TextButton.icon(
-                                  onPressed: _copyDua,
-                                  // ⚠️ on garde l'action active
-                                  icon: Icon(
-                                    Icons.copy,
-                                    size: 18,
-                                    // même teinte que les catégories inactives
-                                    color: isDark ? cs.onSurface : Colors.white,
-                                  ),
-                                  label: const Text(
-                                    'نسخ',
-                                    style: TextStyle(
-                                        fontFamily: 'Lateef', fontSize: 20),
-                                  ),
-                                  style: TextButton.styleFrom(
-                                    // Visuel "non actif" (identique à tes catégories inactives)
-                                    backgroundColor: isDark
-                                        ? Colors.black.withOpacity(0.25)
-                                        : Colors.white.withOpacity(0.18),
-                                    foregroundColor:
-                                        isDark ? cs.onSurface : Colors.white,
-                                    side: BorderSide(
-                                      color: isDark
-                                          ? Colors.black.withOpacity(0.60)
-                                          : Colors.white,
-                                      width: 2,
-                                    ),
-                                    padding:
-                                        const EdgeInsets.symmetric(vertical: 8),
-                                    shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(12)),
-                                  ),
-                                ),
-                              ),
-
-                              const SizedBox(width: 12),
-
-// === PARTAGER (visuel non actif, mais onPressed actif) ===
-                              if (!isGraveVisit)
-                                Expanded(
-                                  child: TextButton.icon(
-                                    onPressed: _shareDuaText,
-                                    // ⚠️ on garde l'action active
-                                    icon: Icon(
-                                      Icons.share,
-                                      size: 18,
-                                      color:
-                                          isDark ? cs.onSurface : Colors.white,
-                                    ),
-                                    label: const Text(
-                                      'مشاركة',
-                                      style: TextStyle(
-                                          fontFamily: 'Lateef', fontSize: 18),
-                                    ),
-                                    style: TextButton.styleFrom(
-                                      backgroundColor: isDark
-                                          ? Colors.black.withOpacity(0.25)
-                                          : Colors.white.withOpacity(0.18),
-                                      foregroundColor:
-                                          isDark ? cs.onSurface : Colors.white,
-                                      side: BorderSide(
-                                        color: isDark
-                                            ? Colors.black.withOpacity(0.60)
-                                            : Colors.white,
-                                        width: 2,
-                                      ),
-                                      padding: const EdgeInsets.symmetric(
-                                          vertical: 8),
-                                      shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(12)),
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-
-                        const SizedBox(height: 2),
-
-                        // === Bouton WhatsApp : "شارك الأجر – أرسل التطبيق لأهلك" ===
-                        if (!isGraveVisit)
-                          Row(
-                            children: [
-                              // ✅ WhatsApp
-                              Expanded(
-                                child: ElevatedButton.icon(
-                                  onPressed: _shareAppOnWhatsApp,
-                                  icon: FaIcon(FontAwesomeIcons.whatsapp,
-                                      color: Colors.white, size: 18),
-                                  label: const Text(
-                                    'أرسل التطبيق لأهلك',
-                                    style: TextStyle(
-                                        fontFamily: 'Lateef', fontSize: 18),
-                                  ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF1E8449),
-                                    foregroundColor: Colors.white,
-                                    padding:
-                                        const EdgeInsets.symmetric(vertical: 8),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    elevation: 0,
-                                  ),
-                                ),
-                              ),
-
-                              const SizedBox(width: 10),
-
-                              // ✅ مشاركة كصورة (V1.2 — remplace "تقييم
-                              // التطبيق" ; le mécanisme d'évaluation reste
-                              // prévu au MVP, voir _rateApp() ci-dessus,
-                              // conservé pour une intégration dédiée
-                              // ultérieure, non supprimé)
-                              Expanded(
-                                child: FilledButton.icon(
-                                  onPressed: _openTemplatePicker,
-                                  icon: const Icon(Icons.image_outlined,
-                                      color: Colors.white, size: 20),
-                                  label: const Text(
-                                    'مشاركة كصورة',
-                                    style: TextStyle(fontSize: 16),
-                                  ),
-                                  style: FilledButton.styleFrom(
-                                    backgroundColor: const Color(0xFF1E8449),
-                                    padding:
-                                        const EdgeInsets.symmetric(vertical: 8),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
 
           // ---- Rendu hors écran pour l'export Premium (capture PNG) ----
           // Toujours EXACTEMENT une image (décision produit V1.2) :
@@ -1250,7 +1036,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           // RenderRepaintBoundary d'avoir un layer composité valide pour
           // toImage(), d'où l'échec silencieux constaté sur appareil réel),
           // Opacity continue de peindre son enfant même à une valeur
-          // proche de 0. Même pattern que l'export "Option A" ci-dessus.
+          // proche de 0.
           IgnorePointer(
             child: Opacity(
               opacity: 0.01,
@@ -1267,103 +1053,4 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ),
     );
   }
-
-  // ===========================================================================
-  // Boutons de catégorie (عام / الجمعة / رمضان)
-  // ===========================================================================
-  Widget _buildCategoryButton({
-    required String keyCat,
-    required String label,
-    required bool isDark,
-    required ColorScheme cs,
-  }) {
-    final bool isActive = _activeCategory == keyCat;
-
-    final onPressed = () => _setCategory(keyCat); // ← IMPORTANT
-
-    if (isActive) {
-      return ElevatedButton(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor:
-              isDark ? Colors.white.withOpacity(0.22) : Colors.white,
-          foregroundColor: isDark ? cs.onSurface : Colors.teal.shade800,
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-        child: Text(label,
-            style: const TextStyle(fontFamily: 'Lateef', fontSize: 20)),
-      );
-    } else {
-      return OutlinedButton(
-        onPressed: onPressed,
-        style: OutlinedButton.styleFrom(
-          backgroundColor: isDark
-              ? Colors.black.withOpacity(0.25)
-              : Colors.white.withOpacity(0.18),
-          side: BorderSide(
-              color: isDark ? Colors.black.withOpacity(0.60) : Colors.white,
-              width: 2),
-          foregroundColor: isDark ? cs.onSurface : Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-        child: Text(label,
-            style: const TextStyle(fontFamily: 'Lateef', fontSize: 20)),
-      );
-    }
-  }
-}
-
-// (Option déco — conservée si tu la réutilises)
-class IslamicHeaderPainter extends CustomPainter {
-  const IslamicHeaderPainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final stroke = Paint()
-      ..color = Colors.white.withOpacity(0.04)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2;
-    final fill = Paint()
-      ..color = Colors.white.withOpacity(0.05)
-      ..style = PaintingStyle.fill;
-
-    const double cellW = 90;
-    const double cellH = 90;
-
-    for (double y = 0; y < size.height; y += cellH) {
-      for (double x = 0; x < size.width; x += cellW) {
-        _drawStar(canvas, Offset(x + 40, y + 20), 28, stroke, fill);
-      }
-    }
-  }
-
-  void _drawStar(
-      Canvas canvas, Offset center, double r, Paint stroke, Paint fill) {
-    final path = Path();
-    const int points = 16;
-    final double step = (2 * math.pi) / points;
-    final double start = math.pi / 8;
-
-    for (int i = 0; i < points; i++) {
-      final radius = (i % 2 == 0) ? r : r * .45;
-      final double angle = start + i * step;
-      final dx = center.dx + radius * math.cos(angle);
-      final dy = center.dy + radius * math.sin(angle);
-      if (i == 0) {
-        path.moveTo(dx, dy);
-      } else {
-        path.lineTo(dx, dy);
-      }
-    }
-    path.close();
-    canvas.drawPath(path, fill);
-    canvas.drawPath(path, stroke);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

@@ -221,7 +221,7 @@ class UserPrefs {
 
   static Future<void> savePersonsData(Map<String, String> data) async {
     final prefs = await SharedPreferences.getInstance();
-    prefs.setString('persons_data', jsonEncode(data));
+    await prefs.setString('persons_data', jsonEncode(data));
   }
 
   static Future<Map<String, String>> getPersonsData() async {
