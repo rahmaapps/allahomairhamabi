@@ -54,6 +54,14 @@ flutter:
     - family: Lateef
       fonts:
         - asset: assets/fonts/Lateef-Regular.ttf
+    - family: IBMPlexSansArabic
+      fonts:
+        - asset: assets/fonts/ibm_plex_sans_arabic/IBMPlexSansArabic-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/ibm_plex_sans_arabic/IBMPlexSansArabic-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/ibm_plex_sans_arabic/IBMPlexSansArabic-SemiBold.ttf
+          weight: 600
 
 
 flutter_native_splash:
