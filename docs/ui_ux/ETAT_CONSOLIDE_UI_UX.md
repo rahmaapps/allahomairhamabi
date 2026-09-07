@@ -3,8 +3,8 @@
 **Application :** اللَّهُمَّ ارْحَمْ أَبِي (Flutter, RTL, arabe)
 **Dépôt :** rahmaapps/allahomairhamabi — branche `github-migration` (remote `github-app`)
 **Date de consolidation initiale :** 2 septembre 2026
-**Dernière synchronisation avec le code réel :** 6 septembre 2026
-**Commit de référence pour l'état d'implémentation :** `dea47c1` (`fix(theme): add bundled IBM Plex Sans Arabic fonts`), publié sur `github-app/github-migration`.
+**Dernière synchronisation avec le code réel :** 7 septembre 2026
+**Commit de référence pour l'état d'implémentation :** `7d6e015` (`fix(home): remove fade from dua text`, LOT 3.I.B), publié sur `github-app/github-migration`. Commit précédent de référence : `1329865` (`feat(dua-read): implement consolidated reading experience`, LOT 3.I).
 **Objet :** source de vérité UI/UX. Ce document combine désormais deux natures de contenu, distinguées par leurs marqueurs : la spécification de conception d'origine (ce qui a été décidé) et l'état réel d'implémentation vérifié dans le code et l'historique Git jusqu'au commit de référence (ce qui est réellement construit et publié). En cas de contradiction entre une ancienne partie de ce document et le code réellement publié, **le code fait foi** ; la partie contredite est corrigée ou explicitement marquée obsolète, jamais laissée telle quelle en silence.
 
 **Convention de lecture :**
@@ -138,7 +138,7 @@ Rayon 24 · élévation `e2` · filet d'or 2 px en tête · rosace 16 pointes à
 - **2 chips** (`عام`, `دعاء الجمعة`), deux intensités : active = aplat `primary` + 600 ; inactive = `surface` + trait + 500. h 44, zone 48.
 - **Changement de catégorie (B2)** : cross-fade + glissement horizontal 16 dp dans le sens RTL, 240 ms. Seul le contenu de la carte change.
 - **« دعاء آخر » (C1)** : cross-fade vertical 10 dp, **entrée par le bas**, 280 ms. **La carte ne bouge pas d'un pixel** — c'est l'animation la plus importante du produit.
-- **Douʿā long** : défile **à l'intérieur** de la carte, dégradé de bord 44 px. Le HOME ne défile jamais.
+- **Douʿā long** : défile **à l'intérieur** de la carte. ✅ **Aucun dégradé de bord** (LOT 3.I.B, `7d6e015` — le `ShaderMask` de fondu 44 px a été supprimé : coupure nette et naturelle aux limites du scroll, texte pleinement opaque en permanence). Le HOME ne défile jamais (seul le texte de la carte défile).
 - **نسخ / مشاركة** : paire horizontale par défaut ; **bascule verticale** si largeur/action < 132 dp, ou `textScaler` ≥ 1,3, ou libellé tronqué.
 - **Favori** : ♡ → ♥ rempli, `scale 1 → 1.12 → 1`, 200 ms. Le retrait ne fait aucun scale (asymétrie volontaire).
 - **A4 — le texte du douʿā est peint à l'opacité 1 dès la frame 0.** Ce qui s'anime est son support, jamais son contenu.
@@ -242,7 +242,7 @@ Marge horizontale d'écran **20**, unique et sans exception · padding de carte 
 ### ✅ Ombres — teintées vert, jamais grises : `rgba(0,58,42,α)`
 
 `e0` trait 1 px · `e1` `0 1px 3px /.07` · `e2` `0 6px 20px /.10` · `e3` `0 12px 34px /.16`.
-**`e2` est le privilège exclusif du contenu sacré** (carte du HOME, carte de lecture 3C, sheet de partage).
+**`e2` est le privilège exclusif du contenu sacré** (carte du HOME, carte de lecture 3C, carte de lecture `DuaReadScreen` — LOT 3.I, `AppCard(level: hero)` —, sheet de partage).
 
 ### ✅ Boutons
 
@@ -276,7 +276,7 @@ Hauteur 48 · rayon 12 · Plex 16/600 · pressé = couleur pressée **+ `scale .
 | **C — `bottom:`** | Bandeau visite — **HOME uniquement**, h 44. |
 
 Style : fond `primary` (Light) / `appBar` (Dark) · **aucune ombre, aucun filet d'or** · `SystemUiOverlayStyle.light`.
-Les écrans secondaires (Favoris, Recherche, Paramètres, Visite) n'ont **aucune icône d'action** dans leur AppBar.
+Les écrans secondaires (Favoris, Recherche, Paramètres, Visite, `DuaReadScreen` — LOT 3.I) n'ont **aucune icône d'action** dans leur AppBar.
 
 ### ✅ Composants communs — état réel d'implémentation (vérifié dans `lib/widgets/`)
 
@@ -290,6 +290,7 @@ Les écrans secondaires (Favoris, Recherche, Paramètres, Visite) n'ont **aucune
 | `AppButton` | `widgets/app_button.dart` | ✅ Implémenté — rôles `primary`/`secondary`/`action` seulement. `text` et `destructive` **non implémentés**, aucun écran ne leur a encore assigné d'usage |
 | `AppChip` | `widgets/app_chip.dart` | ✅ Implémenté — variantes `category` (HOME) et `person` (Personnes) seulement, aucune troisième variante |
 | `showAppUndoSnackBar` | `widgets/app_snackbar.dart` | ✅ Implémenté — utilisé par Personnes et Favoris |
+| `showAppToast` | `widgets/app_snackbar.dart` | ✅ Implémenté (LOT 3.I, `1329865`) — fond `textPrimary`/texte `onPrimary`, 2,5 s, une ligne, aucun bouton ; utilisé par `DuaReadScreen` pour le retour de copie |
 | `AppTheme` (Light/Dark) | `theme/app_theme.dart` | ✅ Implémenté, unique, branché sur `MaterialApp` dans `main.dart` |
 
 ### ✅ Composants communs (spécification d'origine)
@@ -297,7 +298,7 @@ Les écrans secondaires (Favoris, Recherche, Paramètres, Visite) n'ont **aucune
 - **États vides — gabarit unique à 4 couches** : rosace filigrane 88–96 px à 15 % · une phrase en Lateef 24–25 · une phrase d'aide en Plex 12,5 · zéro ou un bouton Primary. Centrage vertical décalé de **−24**. Jamais d'écran vide, jamais d'illustration.
 - **Dialogue** : `surface` · r 24 · padding 24 · max 320 · `e3` · **actions empilées verticalement** (les libellés arabes débordent à fort `textScaler`). Pour une décision, jamais pour une information.
 - **Bottom sheet** : `bg` · r 24 en haut · poignée 36 × 4 · max 85 % de hauteur · fermeture par glissement toujours active.
-- **Toast** : fond `textPrimary`, texte `onPrimary` 13,5, r 12, 2,5 s, **une seule ligne**, aucun bouton.
+- **Toast** : fond `textPrimary`, texte `onPrimary` 13,5, r 12, 2,5 s, **une seule ligne**, aucun bouton. ✅ **Implémenté** (`showAppToast`, LOT 3.I, `1329865`) — voir tableau ci-dessus.
 - **Snackbar avec annulation** : `surfaceAlt` inversé, r 12, **6 s**, action `تراجع`, ancré à 16 dp du bas. Une seule annulation à la fois, jamais empilée.
 - **Interdits absolus :** aucun dialogue au premier lancement, aucun dialogue de notation, aucun dialogue promotionnel Premium.
 
@@ -372,28 +373,39 @@ Mode **Édition** = AppBar h 56, titre **`تدعو لـ`**, retour `→`, **aucu
 - **La carte de favori EST la carte de résultat de recherche, inchangée.** Seul ajout : un ♥ en tête de ligne. Deux listes de douʿās doivent se ressembler.
 - AppBar h 52, `المفضلة`, **aucune icône d'action** — pas de tri, pas de filtre, pas de « tout supprimer ».
 - Ordre : **plus récemment ajouté en premier**, non modifiable.
-- ♥ toujours plein (tout est déjà favori) · appui = **retrait immédiat sans dialogue** → snackbar 6 s `تراجع` restaurant la carte **à sa position d'origine**. ~~Le reste de la carte ouvre la lecture : deux cibles distinctes.~~ ⚠️ **Contredit par le code publié — corrigé ci-dessous.**
+- ♥ toujours plein (tout est déjà favori) · appui = **retrait immédiat sans dialogue** → snackbar 6 s `تراجع` restaurant la carte **à sa position d'origine**. Le reste de la carte ouvre la lecture (`DuaReadScreen`, LOT 3.I) : deux cibles distinctes.
 - État vide : glyphe ♡ + **une seule ligne** `اضغط ♡ على أي دعاء لحفظه هنا.` — explique le geste, ne vante pas la fonction. Aucun CTA, aucune illustration.
 
 ✅ **Implémentation vérifiée et publiée (`b0953b7`)** : `lib/favorites_screen.dart` migré intégralement — `AppTopBar` h52 sans icône d'action, `AppDuaResultCard` (identique à Recherche, `showFavoriteHeart: true`), tri par ajout le plus récent (`getFavoriteIds().reversed`), retrait immédiat + `showAppUndoSnackBar` restaurant la carte à sa position d'origine (`ScaffoldMessenger` local à l'écran pour que le snackbar ne survive pas à la sortie), `AppEmptyState` avec glyphe `Icons.favorite_border`. ❌ **Supprimé** de l'ancienne implémentation : actions individuelles copier/partager sur chaque carte, icône `تحديث` de l'AppBar, ancien état vide avec bouton « العودة », styles codés en dur (`Colors.black26`, `theme.cardColor`).
-⚠️ **Correction du point ci-dessus, vérifiée dans le code publié :** contrairement à ce que disait la ligne barrée, la carte de Favoris **n'ouvre actuellement aucune lecture** — le ♥ est le seul geste. C'est un choix explicite et documenté dans le code lui-même (« Pas de navigation : l'écran de lecture n'est pas spécifié (§7) — la carte reste explicitement neutre en dehors du ♥ »), pas un oubli. Voir la section « DuaReadScreen » ci-dessous pour le point encore réellement ouvert sur ce sujet.
+✅ **Navigation vers la lecture, ajoutée et publiée (LOT 3.I, `1329865`)** : le tap sur le contenu de la carte ouvre désormais `DuaReadScreen` (même transition RTL que Recherche, dupliquée localement) ; le ♥ reste une cible strictement indépendante (`onFavoriteTap` séparé, inchangé). Historique : entre `b0953b7` et `1329865`, cette navigation était volontairement absente (« l'écran de lecture n'est pas spécifié ») — voir la section « DuaReadScreen » ci-dessous, désormais entièrement résolue.
 
 ---
 
-### DuaReadScreen — écran de lecture mutualisé (ouvert depuis Recherche)
+### ✅ DuaReadScreen — LOT 3.I, spécification close **et implémentée**, publiée (`1329865`)
 
-⚠️ **Ce document n'avait jamais nommé cet écran auparavant** — le §7 (historique) le citait seulement comme « destination jamais spécifiée comme écran ». Depuis, il a été construit et publié ; ce point doit donc être corrigé plutôt que rouvert comme si rien n'existait.
+🟢 **IMPLÉMENTÉ ET VALIDÉ.** Référence de spécification : `docs/ui_ux/LOT_3I_DUAREADSCREEN_SPEC.md`. Cet écran, initialement construit au LOT 3.D.0/3.D.1 (`902c397`) pour Recherche seule, a été reconsolidé par le LOT 3.I pour se conformer à la spécification dédiée et ouvert également depuis Favoris.
 
-✅ **Implémentation vérifiée et publiée (`902c397`)** : `lib/screens/dua_read_screen.dart`. Le fichier se déclare lui-même « cadré au LOT 3.D.0, verrouillé par l'architecture du LOT 3.D.1 ». Décisions déjà tranchées et implémentées, vérifiées par lecture directe :
-- **Pleine page**, aucune `AppCard`, aucune ombre, aucun rayon (pas une carte).
-- **AppBar sans titre** : retour (`→`) + ♥ uniquement, mêmes tokens de couleur que HOME/Favoris.
-- **Cœur Favori** : `UserPrefs` comme unique source de vérité, retrait du favori ne ferme jamais l'écran (simple `setState`).
-- **Spacing** : tokens `AppSpacing`/`AppTypography` (`duaBody`), largeur de lecture plafonnée à 340 dp.
-- **Scroll** : centré verticalement si le texte tient dans le viewport, sinon défile (`ConstrainedBox(minHeight: …)` + `SingleChildScrollView`, idiome Flutter standard).
-- **Barre basse fixe** : `نسخ` (secondaire) / `مشاركة` (primaire).
-- **Cohérence avec Recherche** : seul appelant actuel (`search_screen.dart:81`, `DuaReadScreen(duaId: dua.id, origin: DuaReadOrigin.search)`), transition RTL dédiée.
+🔒 **Concept verrouillé :** `DuaReadScreen` est **une carte de lecture agrandie**, pas un écran de texte nu — tout ce qui appartient à la carte (texte, ♥) reste dans la carte ; l'AppBar ne reçoit que le retour.
 
-⏳ **Point réellement encore ouvert (plus étroit qu'un réexamen complet de l'écran) :** l'énumération `DuaReadOrigin` définit une valeur `favorites`, mais **aucun appelant ne l'utilise**. La question à trancher n'est donc pas la conception de `DuaReadScreen` (déjà faite et publiée) mais uniquement : **Favoris doit-il, oui ou non, ouvrir ce même écran de lecture au tap sur la carte ?** Si oui, `DuaReadOrigin.favorites` est déjà prêt à être branché sans modification de l'écran de lecture lui-même.
+✅ **Implémentation vérifiée** (`lib/screens/dua_read_screen.dart`) :
+- **AppBar minimaliste** : `AppTopBar` h 52, **sans titre** (le modèle `Dua` n'a pas de champ titre — rien à inventer), zone B vide, retour (`→`) uniquement.
+- **Carte de lecture** : `AppCard(level: AppCardLevel.hero)` — carte N1 identique à celle du HOME, rosace incluse, aucune duplication locale, aucune variante créée.
+- **♥ dans le pied de la carte**, jamais dans l'AppBar. `UserPrefs` reste l'unique source de vérité ; retirer le ♥ ne ferme jamais l'écran. Animation à l'ajout `scale 1 → 1.12 → 1` (200 ms), aucune animation au retrait (même asymétrie que le ♥ du HOME).
+- **Texte religieux en `AppTypography.duaLong`** (Lateef 31/2.15) — remplace `duaBody`, qui reste réservé à la carte du HOME. RTL, centré, largeur plafonnée à 340 dp, opacité 1 en permanence.
+- **Scroll interne à la carte, seul élément défilant** : centré si le texte tient, défile sinon. **Aucun fade, aucun blur, aucun gradient, aucun `ShaderMask`** sur ce texte — coupure nette et naturelle au bord de la carte (recherche exhaustive dans le fichier : zéro occurrence de ces effets). Cette règle est scopée à `DuaReadScreen` par la spécification du LOT 3.I ; elle ne rouvre ni ne modifie les dégradés déjà documentés ailleurs dans ce document (HOME §2, دعاء زيارة القبر §4 — voir remarque ci-dessous).
+- **`نسخ`/`مشاركة`** conservés : partage **texte simple uniquement** via `Share.share` (mécanisme déjà existant, inchangé) ; copie avec retour via `showAppToast` (§3) — remplace l'ancien `SnackBar` Material brut. **Aucun partage image** dans cette interface (n'en a jamais eu ; le partage image reste propre au HOME, `⤴`, hors périmètre).
+- **États** : douʿā introuvable → `AppEmptyState` (jamais un écran blanc) ; lecture locale → **aucun `CircularProgressIndicator`** (contenu résolu en quelques millisecondes, un seul `FutureBuilder` pour tout l'écran).
+- ❌ **`DuaReadOrigin` supprimé** : confirmé réellement mort par recherche exhaustive avant suppression (paramètre jamais lu) — enum, champ et arguments d'appel retirés.
+
+✅ **Navigation — Recherche** : tap sur le contenu de `AppDuaResultCard` → `DuaReadScreen`. Transition RTL existante **strictement conservée** (glissement 300 ms `easeInOutCubic`, 150 ms fondu si `disableAnimations`) — non modifiée par ce lot, seul l'argument `origin` retiré de l'appel.
+
+✅ **Navigation — Favoris** : tap sur le contenu de la carte → `DuaReadScreen` (même transition, dupliquée localement) ; le ♥ reste une cible strictement indépendante. **Resynchronisation au retour** : si le favori est retiré depuis l'écran de lecture, la liste des favoris le reflète immédiatement au retour (`_refresh()` après le `push`).
+
+🔒 **HOME — inchangé, non concerné par ce lot :** le douʿā du HOME reste directement lisible sur place ; aucune ouverture de `DuaReadScreen` n'y est obligatoire ni n'a été ajoutée.
+
+✅ **Mise à jour (LOT 3.I.B, `7d6e015`)** : la règle « aucun fade sur le texte religieux » est désormais appliquée **au HOME également** — le `ShaderMask` de fondu 44 px (§2) a été supprimé, le texte du douʿā du HOME est pleinement opaque en permanence, coupure nette aux limites du scroll. Seul دعاء زيارة القبر (§4 : « dégradé de fondu 34 px ») conserve encore son propre fondu, non traité par ce lot — un lot distinct (LOT 3.J) reste nécessaire pour uniformiser la règle sur ce dernier écran.
+
+Tests dédiés (`test/dua_read_screen_test.dart`, `test/dua_read_screen_not_found_test.dart`, `test/search_to_dua_read_navigation_test.dart`, `test/favorites_to_dua_read_navigation_test.dart`).
 
 ---
 
@@ -528,7 +540,7 @@ Ne pas rouvrir lors de l'implémentation :
 
 - **رمضان — 374 douʿās aujourd'hui inaccessibles.** La question « dans le périmètre ou plus tard ? » n'a jamais été tranchée. Une réponse « maintenant » relancerait un HOME à sections.
 - **Écran `عن التطبيق`** — ⚠️ partiellement caduc : implémenté comme un simple lien externe (`launchUrl` vers la page GitHub Pages du projet, `settings_screen.dart`), pas comme un écran interne. Le contenu affiché derrière ce lien reste hors périmètre de ce dépôt.
-- ~~**Écran de lecture d'un douʿā ouvert depuis la Recherche ou les Favoris** — cité comme destination, jamais spécifié comme écran.~~ ✅ **Résolu pour Recherche** — voir la section « DuaReadScreen » (§4), implémentée et publiée (`902c397`). ⏳ **Reste ouvert uniquement pour Favoris** : `DuaReadOrigin.favorites` existe mais n'est branché nulle part.
+- ~~**Écran de lecture d'un douʿā ouvert depuis la Recherche ou les Favoris** — cité comme destination, jamais spécifié comme écran.~~ ✅ **Entièrement résolu (LOT 3.I, `1329865`)** — voir la section « DuaReadScreen » (§4) : spécifié, implémenté et branché depuis Recherche **et** Favoris. `DuaReadOrigin` supprimé (devenu inutile).
 - **Multi-personnes en mode visite** (variantes C/E de l'analyse d'architecture) — la Phase 3C spécifie un écran de lecture unique **sans** chips de personnes ni sélecteur. La question est de fait close par la spec, et confirmée par le code publié (`grave_visit_read_screen.dart`, `e63f4c8`) — mais n'a jamais été formellement arbitrée en tant que telle.
 - **`مشاركة التطبيق`** (partage de l'app elle-même) — ⏳ **nouvellement identifié** : code mort dans `home_screen.dart` (`_shareAppOnWhatsApp`, jamais appelé), retiré du menu `⋮` (voir §1) sans qu'une décision explicite de suppression ou de re-rattachement ait été prise.
 - **Ordre Onboarding** — 🔒 décision verrouillée (`لمن تدعو؟` → `تذكير يومي؟`, voir §4 Onboarding) **non encore répercutée dans le code**, qui implémente toujours l'ordre inverse (LOT 3.E.1). Lot de code à prévoir.
@@ -595,9 +607,9 @@ fond **identique au HOME** (`#FFFBF1` Light / `#16211C` Dark) · icône centrée
 
 ---
 
-## 9. État réel de publication et éléments ouverts (mise à jour du 6 septembre 2026)
+## 9. État réel de publication et éléments ouverts (mise à jour du 7 septembre 2026)
 
-Synthèse vérifiée par lecture du code et de l'historique Git jusqu'au commit `dea47c1` (branche `github-migration`, remote `github-app`). Fait foi sur toute section antérieure en cas de contradiction.
+Synthèse vérifiée par lecture du code et de l'historique Git jusqu'au commit `7d6e015` (branche `github-migration`, remote `github-app`). Fait foi sur toute section antérieure en cas de contradiction.
 
 ### A. Écrans / lots réellement terminés et publiés
 
@@ -607,11 +619,12 @@ Synthèse vérifiée par lecture du code et de l'historique Git jusqu'au commit 
 | HOME | `e63f4c8` | ✅ |
 | دعاء زيارة القبر (`GraveVisitReadScreen`) | `e63f4c8` | ✅ (sauf wake lock, toujours ⏳) |
 | Recherche | `902c397` | ✅ |
-| `DuaReadScreen` (lecture depuis Recherche) | `902c397` | ✅ (branchement Favoris toujours ⏳) |
 | Onboarding + Person Selection | `222ea12` | ✅ implémenté — ⚠️ ordre des 2 écrans à inverser (voir §4 Onboarding, décision verrouillée §B) |
 | Favoris | `b0953b7` | ✅ |
 | Paramètres (LOT 3.G) | `b44f700` | ✅ |
 | Police IBM Plex Sans Arabic embarquée | `dea47c1` | ✅ |
+| `DuaReadScreen` (LOT 3.I — carte hero, `duaLong`, ♥ en pied, `showAppToast`, branché depuis Recherche **et** Favoris avec resynchronisation, `DuaReadOrigin` supprimé) | `1329865` | ✅ |
+| Suppression du fondu de bord du HOME (LOT 3.I.B — `ShaderMask`/`LinearGradient`/`BlendMode.dstIn` retirés de `_fadingDuaScroll`, texte pleinement opaque) | `7d6e015` | ✅ |
 
 ### B. Décisions nouvellement verrouillées par ce lot documentaire
 
@@ -634,17 +647,17 @@ Synthèse vérifiée par lecture du code et de l'historique Git jusqu'au commit 
 Aucun élément déjà verrouillé n'est rouvert ici — seuls des points effectivement non tranchés ou non implémentés sont listés, chacun vérifié dans le code au moment de cette mise à jour :
 
 1. **Ordre Onboarding** — décision verrouillée (§B.1) non encore appliquée dans `lib/screens/onboarding_screen.dart`. Lot de code à prévoir, avec réévaluation de la conséquence documentée (sous-titre de l'étape rappel).
-2. **Favoris → écran de lecture** — `DuaReadScreen` existe et fonctionne déjà pour Recherche ; reste à trancher si Favoris doit, lui aussi, ouvrir une lecture au tap sur la carte (`DuaReadOrigin.favorites` déjà prêt, non branché).
-3. **`مشاركة التطبيق`** — code mort (`_shareAppOnWhatsApp` dans `home_screen.dart`), non accessible depuis aucune UI. À trancher : suppression définitive ou re-rattachement à un point d'entrée.
-4. **Wake lock** en mode visite (دعاء زيارة القبر) — toujours non implémenté, arbitrage d'usage jamais formellement tranché.
-5. **Paysage du HOME** (colonne latérale 108 dp) — toujours provisoire, non re-vérifié visuellement dans cet audit.
-6. **`dark_luxe_thumb.png`** — toujours un stub de 68 octets, jamais régénéré depuis le template validé.
-7. **رمضان** (374 douʿās) — toujours hors périmètre, jamais tranché.
-8. **Déclinaison Dark de l'App Icon** — toujours non produite.
-9. **Contenu de `عن التطبيق`** — implémenté comme lien externe uniquement ; le contenu de cette page reste hors du dépôt Flutter.
+2. **`مشاركة التطبيق`** — code mort (`_shareAppOnWhatsApp` dans `home_screen.dart`), non accessible depuis aucune UI. À trancher : suppression définitive ou re-rattachement à un point d'entrée.
+3. **Wake lock** en mode visite (دعاء زيارة القبر) — toujours non implémenté, arbitrage d'usage jamais formellement tranché.
+4. **Paysage du HOME** (colonne latérale 108 dp) — toujours provisoire, non re-vérifié visuellement dans cet audit.
+5. **`dark_luxe_thumb.png`** — toujours un stub de 68 octets, jamais régénéré depuis le template validé.
+6. **رمضان** (374 douʿās) — toujours hors périmètre, jamais tranché.
+7. **Déclinaison Dark de l'App Icon** — toujours non produite.
+8. **Contenu de `عن التطبيق`** — implémenté comme lien externe uniquement ; le contenu de cette page reste hors du dépôt Flutter.
+9. **Fondu de bord دعاء زيارة القبر non uniformisé** — دعاء زيارة القبر (§4, 34 px) conserve encore un dégradé sur le texte religieux. Le HOME (§2) n'est **plus** concerné : son propre fondu de 44 px a été supprimé (LOT 3.I.B, `7d6e015`), alignant désormais HOME et `DuaReadScreen` (LOT 3.I) sur la règle « aucun fade sur le texte religieux ». Un lot distinct (LOT 3.J) reste nécessaire pour دعاء زيارة القبر, seul écran encore concerné.
 
-Aucun de ces 9 points ne bloque l'un des écrans déjà publiés — ce sont des compléments ou des corrections localisées, pas des refontes.
+Aucun de ces 9 points ne bloque l'un des écrans déjà publiés — ce sont des compléments ou des corrections localisées, pas des refontes. Le branchement Favoris → `DuaReadScreen`, précédemment listé ici, est **résolu** (LOT 3.I, `1329865`) — voir §4 « DuaReadScreen ».
 
 ---
 
-*Document de continuité. Les sections 1 à 8 restent la spécification et le plan d'origine (2 septembre 2026, historique). La section 9 est la mise à jour vivante synchronisée avec le code et Git (6 septembre 2026) et prévaut en cas de contradiction. Toute affirmation d'état d'implémentation de ce document est traçable soit aux documents du §0, soit à une lecture directe du code/commit citée en référence.*
+*Document de continuité. Les sections 1 à 8 restent la spécification et le plan d'origine (2 septembre 2026, historique). La section 9 est la mise à jour vivante synchronisée avec le code et Git (7 septembre 2026) et prévaut en cas de contradiction. Toute affirmation d'état d'implémentation de ce document est traçable soit aux documents du §0, soit à une lecture directe du code/commit citée en référence.*
