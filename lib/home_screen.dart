@@ -753,35 +753,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  /// Douʿā défilant à l'intérieur de la carte HOME — dégradé de fondu 44 px
-  /// en haut/bas du contenu défilant (§2 « Douʿā long : défile à
-  /// l'intérieur de la carte, dégradé de bord 44 px »). Construit
-  /// localement à HOME (le scroll n'est pas dans `AppCard`, composant
-  /// partagé non touché — voir rapport d'audit) : même technique que
-  /// `GraveVisitReadScreen._FadingDuaText` (`ShaderMask` + `LinearGradient`
-  /// 4 arrêts), reprise ici sans en faire un composant partagé.
+  /// Douʿā défilant à l'intérieur de la carte HOME — LOT 3.I.B : plus aucun
+  /// fondu d'opacité en haut/bas (l'ancien `ShaderMask` + `LinearGradient`
+  /// réduisait l'alpha réelle du texte religieux, cause confirmée par audit
+  /// dédié). Coupure nette naturelle aux limites du scroll ; texte toujours
+  /// pleinement opaque, typographie et scroll inchangés.
   Widget _fadingDuaScroll(ColorScheme cs) {
-    const fadeHeight = 44.0;
-    return ShaderMask(
-      blendMode: BlendMode.dstIn,
-      shaderCallback: (rect) {
-        final fadeFraction =
-            rect.height > 0 ? (fadeHeight / rect.height).clamp(0.0, 0.5) : 0.0;
-        return LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: const [Colors.transparent, Colors.black, Colors.black, Colors.transparent],
-          stops: [0, fadeFraction, 1 - fadeFraction, 1],
-        ).createShader(rect);
-      },
-      child: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        child: Text(
-          _currentDuaText,
-          textAlign: TextAlign.center,
-          textDirection: TextDirection.rtl,
-          style: AppTypography.duaBody.copyWith(color: cs.onSurface),
-        ),
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      child: Text(
+        _currentDuaText,
+        textAlign: TextAlign.center,
+        textDirection: TextDirection.rtl,
+        style: AppTypography.duaBody.copyWith(color: cs.onSurface),
       ),
     );
   }
