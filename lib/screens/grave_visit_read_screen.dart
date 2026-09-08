@@ -155,63 +155,48 @@ class _GraveVisitCard extends StatelessWidget {
 }
 
 /// Texte du douʿā — seul élément défilant de l'écran, largeur plafonnée
-/// 340 dp (même motif que `DuaReadScreen`), dégradé de fondu 34 px en
-/// haut/bas (§4 : aucun composant existant ne le fournit — implémentation
-/// locale acceptée par le pré-audit).
+/// 340 dp (même motif que `DuaReadScreen`). LOT 3.J : texte pleinement
+/// opaque, aucun fondu artificiel — coupure nette aux limites du scroll,
+/// alignée sur la règle appliquée à HOME (LOT 3.I.B) et à `DuaReadScreen`.
 class _FadingDuaText extends StatelessWidget {
   const _FadingDuaText({required this.text});
 
   final String text;
 
-  static const double _fadeHeight = 34;
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    return ShaderMask(
-      blendMode: BlendMode.dstIn,
-      shaderCallback: (rect) {
-        final fadeFraction =
-            rect.height > 0 ? (_fadeHeight / rect.height).clamp(0.0, 0.5) : 0.0;
-        return LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: const [Colors.transparent, Colors.black, Colors.black, Colors.transparent],
-          stops: [0, fadeFraction, 1 - fadeFraction, 1],
-        ).createShader(rect);
-      },
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          // Centré verticalement si le texte tient ; défile sinon — même
-          // idiome que `DuaReadScreen`.
-          return SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.xl,
-              vertical: AppSpacing.lg,
-            ),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: constraints.maxHeight),
-              child: Center(
-                child: ConstrainedBox(
-                  // Tablette : largeur de lecture plafonnée à 340 dp (§4).
-                  constraints: const BoxConstraints(maxWidth: 340),
-                  child: Text(
-                    text,
-                    textAlign: TextAlign.center,
-                    textDirection: TextDirection.rtl,
-                    style: AppTypography.duaBody.copyWith(
-                      fontSize: 27,
-                      height: 2.0,
-                      color: cs.onSurface,
-                    ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Centré verticalement si le texte tient ; défile sinon — même
+        // idiome que `DuaReadScreen`.
+        return SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.xl,
+            vertical: AppSpacing.lg,
+          ),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Center(
+              child: ConstrainedBox(
+                // Tablette : largeur de lecture plafonnée à 340 dp (§4).
+                constraints: const BoxConstraints(maxWidth: 340),
+                child: Text(
+                  text,
+                  textAlign: TextAlign.center,
+                  textDirection: TextDirection.rtl,
+                  style: AppTypography.duaBody.copyWith(
+                    fontSize: 27,
+                    height: 2.0,
+                    color: cs.onSurface,
                   ),
                 ),
               ),
             ),
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 }
