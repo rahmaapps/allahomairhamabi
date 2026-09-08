@@ -364,6 +364,25 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Sous-titre dynamique reprenant la première personne cochée à
+          // l'étape précédente (§4 Onboarding) — n'a de sens que depuis le
+          // réalignement de l'ordre (LOT 3.K) : au moins une personne peut
+          // désormais déjà être sélectionnée en arrivant sur cette étape.
+          // `_selectedPersons` est un `LinkedHashSet` (littéral `{}`) : son
+          // ordre d'itération suit l'ordre de coche, donc `.first` est
+          // bien « la première personne cochée » et se met à jour si elle
+          // est décochée. Même idiome que la ligne « pour qui » du HOME
+          // (`_possessivePersonLabel`), réutilise `_possessiveLabel` déjà
+          // défini dans ce fichier — aucun nouveau composant.
+          if (_selectedPersons.isNotEmpty) ...[
+            Text(
+              'تدعو لـ ${_possessiveLabel(_selectedPersons.first)}',
+              textAlign: TextAlign.center,
+              textDirection: TextDirection.rtl,
+              style: AppTypography.label.copyWith(color: cs.onSurfaceVariant),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+          ],
           AppCard(
             level: AppCardLevel.content,
             child: Column(
