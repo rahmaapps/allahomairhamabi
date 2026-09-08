@@ -3,8 +3,8 @@
 **Application :** اللَّهُمَّ ارْحَمْ أَبِي (Flutter, RTL, arabe)
 **Dépôt :** rahmaapps/allahomairhamabi — branche `github-migration` (remote `github-app`)
 **Date de consolidation initiale :** 2 septembre 2026
-**Dernière synchronisation avec le code réel :** 7 septembre 2026
-**Commit de référence pour l'état d'implémentation :** `7d6e015` (`fix(home): remove fade from dua text`, LOT 3.I.B), publié sur `github-app/github-migration`. Commit précédent de référence : `1329865` (`feat(dua-read): implement consolidated reading experience`, LOT 3.I).
+**Dernière synchronisation avec le code réel :** 8 septembre 2026
+**Commit de référence pour l'état d'implémentation :** `3cee368` (`fix(grave-visit): remove fade from dua text`, LOT 3.J), publié sur `github-app/github-migration`. Commits précédents de référence : `7d6e015` (`fix(home): remove fade from dua text`, LOT 3.I.B), `1329865` (`feat(dua-read): implement consolidated reading experience`, LOT 3.I).
 **Objet :** source de vérité UI/UX. Ce document combine désormais deux natures de contenu, distinguées par leurs marqueurs : la spécification de conception d'origine (ce qui a été décidé) et l'état réel d'implémentation vérifié dans le code et l'historique Git jusqu'au commit de référence (ce qui est réellement construit et publié). En cas de contradiction entre une ancienne partie de ce document et le code réellement publié, **le code fait foi** ; la partie contredite est corrigée ou explicitement marquée obsolète, jamais laissée telle quelle en silence.
 
 **Convention de lecture :**
@@ -403,7 +403,9 @@ Mode **Édition** = AppBar h 56, titre **`تدعو لـ`**, retour `→`, **aucu
 
 🔒 **HOME — inchangé, non concerné par ce lot :** le douʿā du HOME reste directement lisible sur place ; aucune ouverture de `DuaReadScreen` n'y est obligatoire ni n'a été ajoutée.
 
-✅ **Mise à jour (LOT 3.I.B, `7d6e015`)** : la règle « aucun fade sur le texte religieux » est désormais appliquée **au HOME également** — le `ShaderMask` de fondu 44 px (§2) a été supprimé, le texte du douʿā du HOME est pleinement opaque en permanence, coupure nette aux limites du scroll. Seul دعاء زيارة القبر (§4 : « dégradé de fondu 34 px ») conserve encore son propre fondu, non traité par ce lot — un lot distinct (LOT 3.J) reste nécessaire pour uniformiser la règle sur ce dernier écran.
+✅ **Mise à jour (LOT 3.I.B, `7d6e015`)** : la règle « aucun fade sur le texte religieux » est désormais appliquée **au HOME également** — le `ShaderMask` de fondu 44 px (§2) a été supprimé, le texte du douʿā du HOME est pleinement opaque en permanence, coupure nette aux limites du scroll.
+
+✅ **Mise à jour (LOT 3.J, `3cee368`)** : la même règle est désormais appliquée à **دعاء زيارة القبر** — le `ShaderMask`/`shaderCallback`/`LinearGradient`/`BlendMode.dstIn`/`_fadeHeight` (fondu de 34 px, §4) ont été supprimés, le texte religieux de `GraveVisitReadScreen` est pleinement opaque en permanence, coupure nette aux limites du scroll. Les trois écrans qui affichent un texte religieux long (HOME, `DuaReadScreen`, دعاء زيارة القبر) appliquent désormais uniformément la règle « aucun fade sur le texte religieux ».
 
 Tests dédiés (`test/dua_read_screen_test.dart`, `test/dua_read_screen_not_found_test.dart`, `test/search_to_dua_read_navigation_test.dart`, `test/favorites_to_dua_read_navigation_test.dart`).
 
@@ -450,12 +452,14 @@ Tests dédiés (`test/dua_read_screen_test.dart`, `test/dua_read_screen_not_foun
 
 - Écran plein, AppBar h 52, `→`, **aucune icône d'action**. Un seul objet : la carte de lecture.
 - Carte `Expanded` · `surface` · `r-hero 24` · `e2` · filet or + ✦ **fixe en tête** (seul ornement, aucune rosace) · attribution `رواه مسلم` fixe en pied.
-- Texte **Lateef 27/2.0** centré, **seul élément défilant**, dégradé de fondu 34 px. **Jamais réduit à 320 dp.**
+- Texte **Lateef 27/2.0** centré, **seul élément défilant**. ~~dégradé de fondu 34 px~~ ❌ **obsolète, contredit par le code publié (LOT 3.J, `3cee368`)** — voir la mise à jour ci-dessous : le texte est désormais pleinement opaque en permanence, coupure nette aux limites du scroll. **Jamais réduit à 320 dp.**
 - **N2 délibérément vide** — le seul écran de l'application dans ce cas.
 - Tablette : largeur de lecture plafonnée à **340 dp**. Paysage : pleine largeur, aucune colonne latérale.
 - ⏳ **Wake lock : non appliqué** (proposition), voir §6.
 
 ✅ **Implémentation vérifiée et publiée (`e63f4c8`)** : `lib/screens/grave_visit_read_screen.dart` — écran dédié, atteint depuis le bandeau du HOME via une sélection de personne (bottom sheet, voir `home_screen.dart` — `_openGraveVisitPersonPicker`), lecture intégrale scrollable, aucune action (confirmé par `test/grave_visit_read_screen_direct_test.dart` : « aucune action interdite (copie/partage/favori/دعاء آخر), aucune attribution, retour présent »). Traité comme un flux **distinct**, jamais comme une catégorie de douʿās partageable — pas de chip, pas d'onglet, retiré de la rangée de filtres du HOME. ⏳ **Wake lock toujours non implémenté** (aucun package de ce type dans `pubspec.yaml`, aucune référence dans le code) — l'arbitrage reste ouvert, le comportement actuel de facto correspond à la proposition « ne pas l'activer », sans que ce soit une décision formellement tranchée.
+
+✅ **Mise à jour (LOT 3.J, `3cee368`)** : le dégradé de fondu de 34 px (`ShaderMask`/`shaderCallback`/`LinearGradient`/`BlendMode.dstIn`/`_fadeHeight`) a été supprimé de `_FadingDuaText` dans `grave_visit_read_screen.dart`. Le texte religieux est désormais pleinement opaque en permanence, peint avec `cs.onSurface`, coupure nette et naturelle aux limites du scroll — même règle que HOME (LOT 3.I.B, `7d6e015`) et `DuaReadScreen` (LOT 3.I, `1329865`). Conservés à l'identique : `LayoutBuilder`, `SingleChildScrollView`, centrage vertical du texte court, largeur de lecture plafonnée à 340 dp, `TextAlign.center`, `TextDirection.rtl`, `AppTypography.duaBody` (fontSize 27, height 2.0), carte `_GraveVisitCard`, navigation existante. **Seul le wake lock reste un arbitrage ouvert** pour cet écran (voir ⏳ ci-dessus et §9).
 
 ### ✅ Partage Premium — spécification close
 
@@ -607,9 +611,9 @@ fond **identique au HOME** (`#FFFBF1` Light / `#16211C` Dark) · icône centrée
 
 ---
 
-## 9. État réel de publication et éléments ouverts (mise à jour du 7 septembre 2026)
+## 9. État réel de publication et éléments ouverts (mise à jour du 7 septembre 2026 ; complétée le 8 septembre 2026 — LOT 3.J)
 
-Synthèse vérifiée par lecture du code et de l'historique Git jusqu'au commit `7d6e015` (branche `github-migration`, remote `github-app`). Fait foi sur toute section antérieure en cas de contradiction.
+Synthèse vérifiée par lecture du code et de l'historique Git jusqu'au commit `3cee368` (branche `github-migration`, remote `github-app`). Fait foi sur toute section antérieure en cas de contradiction.
 
 ### A. Écrans / lots réellement terminés et publiés
 
@@ -625,6 +629,7 @@ Synthèse vérifiée par lecture du code et de l'historique Git jusqu'au commit 
 | Police IBM Plex Sans Arabic embarquée | `dea47c1` | ✅ |
 | `DuaReadScreen` (LOT 3.I — carte hero, `duaLong`, ♥ en pied, `showAppToast`, branché depuis Recherche **et** Favoris avec resynchronisation, `DuaReadOrigin` supprimé) | `1329865` | ✅ |
 | Suppression du fondu de bord du HOME (LOT 3.I.B — `ShaderMask`/`LinearGradient`/`BlendMode.dstIn` retirés de `_fadingDuaScroll`, texte pleinement opaque) | `7d6e015` | ✅ |
+| Suppression du fondu de bord de دعاء زيارة القبر (LOT 3.J — `ShaderMask`/`shaderCallback`/`LinearGradient`/`BlendMode.dstIn`/`_fadeHeight` retirés de `_FadingDuaText`, texte pleinement opaque) | `3cee368` | ✅ |
 
 ### B. Décisions nouvellement verrouillées par ce lot documentaire
 
@@ -654,9 +659,8 @@ Aucun élément déjà verrouillé n'est rouvert ici — seuls des points effect
 6. **رمضان** (374 douʿās) — toujours hors périmètre, jamais tranché.
 7. **Déclinaison Dark de l'App Icon** — toujours non produite.
 8. **Contenu de `عن التطبيق`** — implémenté comme lien externe uniquement ; le contenu de cette page reste hors du dépôt Flutter.
-9. **Fondu de bord دعاء زيارة القبر non uniformisé** — دعاء زيارة القبر (§4, 34 px) conserve encore un dégradé sur le texte religieux. Le HOME (§2) n'est **plus** concerné : son propre fondu de 44 px a été supprimé (LOT 3.I.B, `7d6e015`), alignant désormais HOME et `DuaReadScreen` (LOT 3.I) sur la règle « aucun fade sur le texte religieux ». Un lot distinct (LOT 3.J) reste nécessaire pour دعاء زيارة القبر, seul écran encore concerné.
 
-Aucun de ces 9 points ne bloque l'un des écrans déjà publiés — ce sont des compléments ou des corrections localisées, pas des refontes. Le branchement Favoris → `DuaReadScreen`, précédemment listé ici, est **résolu** (LOT 3.I, `1329865`) — voir §4 « DuaReadScreen ».
+Aucun de ces 8 points ne bloque l'un des écrans déjà publiés — ce sont des compléments ou des corrections localisées, pas des refontes. Le branchement Favoris → `DuaReadScreen`, précédemment listé ici, est **résolu** (LOT 3.I, `1329865`) — voir §4 « DuaReadScreen ». Le fondu de bord de دعاء زيارة القبر, précédemment listé ici comme 9ᵉ point (« non uniformisé »), est **résolu** (LOT 3.J, `3cee368`) — voir §4 « دعاء زيارة القبر » et le tableau A ci-dessus. Les trois écrans à texte religieux long (HOME, `DuaReadScreen`, دعاء زيارة القبر) appliquent désormais uniformément la règle « aucun fade sur le texte religieux ».
 
 ---
 
