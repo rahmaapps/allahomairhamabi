@@ -129,6 +129,24 @@ class UserPrefs {
   }
 
   // ============================================================
+  // 🖼️ PARTAGE PREMIUM — template sélectionné (§4 Partage Premium :
+  // « Persistée (share_template) »). Stocke le nom de l'enum
+  // (`PremiumTemplate.name`, ex. "darkLuxe") ; `null` si jamais choisi —
+  // à l'appelant de retomber sur Dark Luxe par défaut dans ce cas.
+  // ============================================================
+  static const _kShareTemplate = 'share_template';
+
+  Future<String?> getShareTemplate() async {
+    final sp = await _prefs();
+    return sp.getString(_kShareTemplate);
+  }
+
+  Future<void> setShareTemplate(String templateName) async {
+    final sp = await _prefs();
+    await sp.setString(_kShareTemplate, templateName);
+  }
+
+  // ============================================================
   // ⭐️ FAVORIS
   // ============================================================
   Future<List<int>> getFavoriteIds() async {

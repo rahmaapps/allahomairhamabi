@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -105,6 +106,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         .animate(CurvedAnimation(parent: _anim, curve: Curves.easeOut));
 
     _loadInitial();
+    _loadSelectedTemplate();
   }
 
   @override
@@ -180,6 +182,24 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Future<void> _refreshLengthFilter() async {
     _lengthFilter =
         await UserPrefs.instance.getLengthFilter(); // 'all' | 'short' | 'long'
+  }
+
+  /// Charge le template Partage Premium choisi lors d'une session
+  /// précédente (§4 Partage Premium : « Persistée (share_template) »).
+  /// Dark Luxe reste la valeur par défaut si aucune préférence n'existe
+  /// ou si la valeur stockée ne correspond plus à un template connu.
+  Future<void> _loadSelectedTemplate() async {
+    final saved = await UserPrefs.instance.getShareTemplate();
+    if (!mounted) return;
+    setState(() => _selectedTemplate = _templateFromName(saved));
+  }
+
+  PremiumTemplate _templateFromName(String? name) {
+    if (name == null) return PremiumTemplate.darkLuxe;
+    return PremiumTemplate.values.firstWhere(
+      (t) => t.name == name,
+      orElse: () => PremiumTemplate.darkLuxe,
+    );
   }
 
   // ===========================================================================
@@ -348,18 +368,43 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
-  Future<void> _sharePremiumImage() async {
+  /// Retourne `true` si l'image a été générée et remise au mécanisme de
+  /// partage natif avec succès, `false` sinon — plus jamais un échec
+  /// silencieux (§4 Partage Premium : « ne plus échouer silencieusement »,
+  /// voir l'état échec dans `_openTemplatePicker`). La génération (rendu
+  /// PNG) et le partage lui-même peuvent chacun échouer ; les deux sont
+  /// couverts ici.
+  Future<bool> _sharePremiumImage() async {
     final png = await _renderPremiumPng();
-    if (png == null) return;
+    if (png == null) return false;
 
-    await Share.shareXFiles([
-      XFile.fromData(png, name: 'dua_premium.png', mimeType: 'image/png'),
-    ]);
+    try {
+      await Share.shareXFiles([
+        XFile.fromData(png, name: 'dua_premium.png', mimeType: 'image/png'),
+      ]);
+      return true;
+    } catch (e, st) {
+      debugPrint('Erreur partage Premium: $e\n$st');
+      return false;
+    }
   }
 
   // Bottom sheet Partage Premium — 3 vignettes 74×104, poids strictement
   // égal, ordre RTL Dark Luxe → Emerald → White (§4 Partage Premium).
   // Sélection = 3 signaux simultanés : anneau 2px, pastille ✓, libellé 600.
+  //
+  // Flux (§4, alignement littéral) : la sélection d'une vignette PERSISTE
+  // le template mais ne déclenche plus le partage — un bouton d'action
+  // unique en bas de la feuille (« مشاركة كصورة ») lance ensuite la
+  // génération/partage. `StatefulBuilder` local à la feuille, aucun nouvel
+  // écran/composant séparé. Le bouton garde toujours sa taille (largeur
+  // `double.infinity` + hauteur fixe 48 d'`AppButton`) ; seul son contenu
+  // change (« جارٍ التحضير… » après 400 ms). La feuille se ferme
+  // uniquement après succès du partage natif ; en cas d'échec elle reste
+  // ouverte, la ligne d'erreur apparaît AU-DESSUS du bouton (§4), et le
+  // bouton reste disponible pour réessayer. `sheetContext.mounted` évite
+  // tout `setState`/`Navigator.pop` après fermeture manuelle de la
+  // feuille pendant une génération en cours.
   void _openTemplatePicker() {
     final cs = Theme.of(context).colorScheme;
 
@@ -372,69 +417,164 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadii.hero)),
       ),
       builder: (sheetContext) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.xl,
-            AppSpacing.md,
-            AppSpacing.xl,
-            AppSpacing.xxl,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            textDirection: TextDirection.rtl,
-            children: PremiumTemplate.values.map((t) {
-              final selected = t == _selectedTemplate;
+        // Déclarées ici (portée du builder de la feuille, exécuté une
+        // seule fois à l'ouverture) — PAS dans le builder de
+        // `StatefulBuilder` ci-dessous, qui se ré-exécute à chaque
+        // `setSheetState` et réinitialiserait ces variables sinon.
+        bool busy = false;
+        bool showPreparingLabel = false;
+        String? errorMessage;
+        Timer? prepTimer;
 
-              return GestureDetector(
-                onTap: () {
-                  setState(() => _selectedTemplate = t);
-                  Navigator.pop(sheetContext);
-                  _sharePremiumImage();
-                },
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        Container(
-                          width: 74,
-                          height: 104,
-                          decoration: BoxDecoration(
-                            borderRadius: AppRadii.cardRadius,
-                            image: DecorationImage(
-                              image: AssetImage(t.thumbAsset),
-                              fit: BoxFit.cover,
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            // Sélection seule : persiste le template (§4 : « Persistée
+            // (share_template) »), ne lance rien. `setSheetState` fait
+            // réapparaître l'anneau/pastille sur la bonne vignette — la
+            // feuille n'est pas un descendant de `HomeScreen` dans
+            // l'arbre (route séparée du `Navigator`), un `setState`
+            // externe seul ne la reconstruirait pas.
+            void selectTemplate(PremiumTemplate t) {
+              if (busy) return;
+              setState(() => _selectedTemplate = t);
+              unawaited(UserPrefs.instance.setShareTemplate(t.name));
+              setSheetState(() {});
+            }
+
+            Future<void> handleSharePressed() async {
+              if (busy) return;
+
+              setSheetState(() {
+                busy = true;
+                showPreparingLabel = false;
+                errorMessage = null;
+              });
+
+              // « جارٍ التحضير… » affiché seulement au-delà de 400 ms
+              // (§4) — jamais pour un rendu quasi instantané.
+              prepTimer = Timer(const Duration(milliseconds: 400), () {
+                if (sheetContext.mounted) {
+                  setSheetState(() => showPreparingLabel = true);
+                }
+              });
+
+              final success = await _sharePremiumImage();
+              prepTimer?.cancel();
+
+              if (!sheetContext.mounted) return;
+
+              if (success) {
+                Navigator.pop(sheetContext);
+              } else {
+                setSheetState(() {
+                  busy = false;
+                  showPreparingLabel = false;
+                  errorMessage = 'تعذّر تحضير الصورة، حاول مرة أخرى';
+                });
+              }
+            }
+
+            // `MediaQuery.viewPaddingOf` (jamais réduit par un `SafeArea`
+            // ancêtre, contrairement à `.padding`) : garantit que le bouton
+            // « مشاركة كصورة » reste entièrement visible au-dessus de la
+            // barre de navigation système, quel que soit le comportement
+            // réel de `useSafeArea` sur l'appareil — même correctif déjà
+            // appliqué à la feuille دعاء زيارة القبر
+            // (`_openGraveVisitPersonPicker`) suite à la même anomalie
+            // constatée en test manuel (LOT 3.L).
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                AppSpacing.xl,
+                AppSpacing.md,
+                AppSpacing.xl,
+                AppSpacing.xxl + MediaQuery.viewPaddingOf(sheetContext).bottom,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    textDirection: TextDirection.rtl,
+                    children: PremiumTemplate.values.map((t) {
+                      final selected = t == _selectedTemplate;
+
+                      return GestureDetector(
+                        onTap: () => selectTemplate(t),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Container(
+                                  width: 74,
+                                  height: 104,
+                                  decoration: BoxDecoration(
+                                    borderRadius: AppRadii.cardRadius,
+                                    image: DecorationImage(
+                                      image: AssetImage(t.thumbAsset),
+                                      fit: BoxFit.cover,
+                                    ),
+                                    border: Border.all(
+                                      width: selected ? 2 : 1,
+                                      color: selected ? cs.primary : cs.outline,
+                                    ),
+                                  ),
+                                ),
+                                if (selected)
+                                  Positioned(
+                                    top: -6,
+                                    right: -6,
+                                    child: Icon(Icons.check_circle,
+                                        color: cs.primary, size: 18),
+                                  ),
+                              ],
                             ),
-                            border: Border.all(
-                              width: selected ? 2 : 1,
-                              color: selected ? cs.primary : cs.outline,
+                            const SizedBox(height: AppSpacing.sm),
+                            Text(
+                              t.displayName,
+                              textDirection: TextDirection.rtl,
+                              style: AppTypography.label.copyWith(
+                                color: cs.onSurface,
+                                fontWeight:
+                                    selected ? FontWeight.w600 : FontWeight.w500,
+                              ),
                             ),
-                          ),
+                          ],
                         ),
-                        if (selected)
-                          Positioned(
-                            top: -6,
-                            right: -6,
-                            child: Icon(Icons.check_circle,
-                                color: cs.primary, size: 18),
-                          ),
-                      ],
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  // État échec (§4 : « une ligne d'erreur au-dessus du
+                  // bouton ») — inline, aucun SnackBar/dialogue ; la
+                  // feuille reste utilisable, le bouton permet de
+                  // réessayer.
+                  if (errorMessage != null) ...[
+                    Text(
+                      errorMessage!,
+                      textAlign: TextAlign.center,
+                      textDirection: TextDirection.rtl,
+                      style: AppTypography.label.copyWith(color: cs.error),
                     ),
                     const SizedBox(height: AppSpacing.sm),
-                    Text(
-                      t.displayName,
-                      textDirection: TextDirection.rtl,
-                      style: AppTypography.label.copyWith(
-                        color: cs.onSurface,
-                        fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                      ),
-                    ),
                   ],
-                ),
-              );
-            }).toList(),
-          ),
+                  // Bouton d'action unique — taille fixe (largeur pleine +
+                  // hauteur 48 d'AppButton) quel que soit son contenu ;
+                  // seul le contenu change, jamais la taille (§4).
+                  SizedBox(
+                    width: double.infinity,
+                    child: AppButton(
+                      role: AppButtonRole.primary,
+                      icon: showPreparingLabel ? null : Icons.ios_share,
+                      label: showPreparingLabel ? 'جارٍ التحضير…' : 'مشاركة كصورة',
+                      onPressed: busy ? null : handleSharePressed,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
         );
       },
     );
@@ -1021,14 +1161,33 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           // toImage(), d'où l'échec silencieux constaté sur appareil réel),
           // Opacity continue de peindre son enfant même à une valeur
           // proche de 0.
+          //
+          // OverflowBox (LOT 3.L) : ce sous-arbre est un enfant non-Positioned
+          // du Stack racine, qui lui impose des contraintes loose bornées à
+          // la taille de l'écran. Sans OverflowBox, le SizedBox interne de
+          // PremiumExportCard (dimensionné à template.fixedTemplateSize, ex.
+          // 1086×1448) est donc clampé à la taille de l'écran par
+          // BoxConstraints.enforce(), et le RepaintBoundary capture une
+          // image à la mauvaise taille/ratio (le dou'a déborde de
+          // duaTextZone). OverflowBox retire cette contrainte max en
+          // passant des contraintes non bornées à son enfant : le
+          // RepaintBoundary est alors layouté exactement à
+          // template.fixedTemplateSize, indépendamment de l'écran.
           IgnorePointer(
             child: Opacity(
               opacity: 0.01,
-              child: RepaintBoundary(
-                key: _exportKey,
-                child: PremiumExportCard(
-                  template: _selectedTemplate,
-                  duaText: _currentDuaText,
+              child: OverflowBox(
+                minWidth: 0,
+                minHeight: 0,
+                maxWidth: double.infinity,
+                maxHeight: double.infinity,
+                alignment: Alignment.topLeft,
+                child: RepaintBoundary(
+                  key: _exportKey,
+                  child: PremiumExportCard(
+                    template: _selectedTemplate,
+                    duaText: _currentDuaText,
+                  ),
                 ),
               ),
             ),
