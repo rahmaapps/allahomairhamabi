@@ -3,8 +3,8 @@
 **Application :** اللَّهُمَّ ارْحَمْ أَبِي (Flutter, RTL, arabe)
 **Dépôt :** rahmaapps/allahomairhamabi — branche `github-migration` (remote `github-app`)
 **Date de consolidation initiale :** 2 septembre 2026
-**Dernière synchronisation avec le code réel :** 8 septembre 2026
-**Commit de référence pour l'état d'implémentation :** `3cee368` (`fix(grave-visit): remove fade from dua text`, LOT 3.J), publié sur `github-app/github-migration`. Commits précédents de référence : `7d6e015` (`fix(home): remove fade from dua text`, LOT 3.I.B), `1329865` (`feat(dua-read): implement consolidated reading experience`, LOT 3.I).
+**Dernière synchronisation avec le code réel :** 9 septembre 2026 (LOT 3.N)
+**Commit de référence pour l'état d'implémentation :** `ad6fee7` (`fix(premium-share): fix export sizing and share sheet layout`, LOT 3.L), publié sur `github-app/github-migration`. Commits précédents de référence : `9c0aa4c` (`fix(onboarding): align reminder step subtitle with selected person`, LOT 3.K), `0cc0b24` (`feat(onboarding): reorder persons and daily reminder steps`, LOT 3.H), `3cee368` (`fix(grave-visit): remove fade from dua text`, LOT 3.J), `7d6e015` (`fix(home): remove fade from dua text`, LOT 3.I.B), `1329865` (`feat(dua-read): implement consolidated reading experience`, LOT 3.I).
 **Objet :** source de vérité UI/UX. Ce document combine désormais deux natures de contenu, distinguées par leurs marqueurs : la spécification de conception d'origine (ce qui a été décidé) et l'état réel d'implémentation vérifié dans le code et l'historique Git jusqu'au commit de référence (ce qui est réellement construit et publié). En cas de contradiction entre une ancienne partie de ce document et le code réellement publié, **le code fait foi** ; la partie contredite est corrigée ou explicitement marquée obsolète, jamais laissée telle quelle en silence.
 
 **Convention de lecture :**
@@ -330,7 +330,7 @@ Les écrans secondaires (Favoris, Recherche, Paramètres, Visite, `DuaReadScreen
 
 🔒 **Décision verrouillée (ordre définitif) :** `لمن تدعو؟` → `تذكير يومي؟`. Toute référence proposant l'ordre inverse est obsolète.
 
-⚠️ **Écart vérifié avec le code publié (`222ea12`) — non corrigé par ce lot documentaire (documentaire uniquement, aucun code modifié) :** `lib/screens/onboarding_screen.dart` implémente actuellement l'ordre **inverse** — `تذكير يومي؟` puis `لمن تدعو؟` — par une décision produit explicite antérieure (LOT 3.E.1), documentée dans le code lui-même : *« Ordre retenu pour ce lot (LOT 3.E.1, décision produit explicite) : تذكير يومي؟ puis لمن تدعو؟ — inverse de l'exemple du document… Conséquence assumée : le sous-titre dynamique de l'étape rappel "reprenant la première personne cochée" […] ne s'applique plus ici. »* Confirmé par `test/onboarding_screen_test.dart` (l'étape 1 affiche `تذكير يومي؟`). **La décision ci-dessus rouvre donc explicitement ce point** : un lot de code dédié doit inverser l'ordre des deux écrans et réévaluer la conséquence documentée (sous-titre de l'étape rappel). ⏳ Tant que ce lot de code n'est pas fait, l'ordre réellement publié reste l'ancien (`تذكير يومي؟` → `لمن تدعو؟`).
+✅ **Répercuté dans le code publié (LOT 3.H, `0cc0b24` — « feat(onboarding): reorder persons and daily reminder steps »)** : `lib/screens/onboarding_screen.dart` implémente désormais l'ordre verrouillé ci-dessus — `_step == 0` affiche `لمن تدعو؟`, `_step == 1` affiche `تذكير يومي؟`. L'en-tête du fichier documente lui-même le changement : *« LOT 3.H — ordre corrigé pour se conformer à la décision verrouillée [...] Remplace l'ordre inverse retenu par LOT 3.E.1. »* Ce commit est **antérieur** au précédent commit de référence de ce document (`3cee368`, LOT 3.J) : l'écart signalé ici jusqu'au LOT 3.M tenait à un retard de synchronisation documentaire, pas à un retard de code. **Conséquence réévaluée :** le sous-titre dynamique de l'étape rappel (« reprenant la première personne cochée »), un temps considéré caduc du fait de l'ancien ordre, a été rétabli par le LOT 3.K (`9c0aa4c` — « fix(onboarding): align reminder step subtitle with selected person ») : l'étape `تذكير يومي؟`, désormais seconde, affiche `تدعو لـ <personne>` reprenant la première personne cochée à l'étape précédente.
 
 - Squelette commun à 5 strates ; **la liste est le seul élément flexible**, le bloc d'actions est **ancré en bas**.
 - Titres en **Plex 22/600, pas en Lateef** (corrige la maquette historique `2i`). Seule exception : l'heure `٠٧:٣٠` en **Lateef 26**.
@@ -473,6 +473,8 @@ Tests dédiés (`test/dua_read_screen_test.dart`, `test/dua_read_screen_not_foun
 - **✅ Règle de comportement figée :** le partage utilise le **mécanisme natif de la plateforme**. Aucun nouvel écran, dialogue, composant intermédiaire ni animation spécifique. L'annulation ramène exactement à l'écran précédent, **sans perte d'état**.
 - Dark Mode : **les vignettes ne changent pas** — un template clair reste clair.
 
+✅ **Implémentation vérifiée et publiée (LOT 3.L, `ad6fee7`)** : pipeline d'export corrigé — `PremiumExportCard` est désormais layouté hors-écran via un `OverflowBox` (`home_screen.dart`) qui retire la contrainte de taille héritée du `Stack` racine du HOME, garantissant que le `RenderRepaintBoundary` capturé correspond exactement à `template.fixedTemplateSize` pour les 3 templates (le dou'a reste dans `duaTextZone`, jamais rogné). Les 3 vignettes (`dark_luxe_thumb.png`, `emerald_thumb.png`, `white_elegant_thumb.png`) sont désormais de vraies réductions des templates PNG complets — voir §6 (tableau des bugs) et §9. Le bouton unique `مشاركة كصورة` du bottom sheet tient compte de l'inset de navigation système (`MediaQuery.viewPaddingOf`, même motif déjà utilisé pour دعاء زيارة القبر) et reste entièrement visible au-dessus de celle-ci. Validé fonctionnellement sur appareil réel pour les 3 templates.
+
 ---
 
 ## 5. Wireframes, maquettes et prototypes produits
@@ -520,7 +522,7 @@ Ne pas rouvrir lors de l'implémentation :
 | Troncature de `دعاء زيارة القبر` dans un tiers de rangée | Résolu : le libellé sort de la rangée de chips | ✅ **Corrigé, vérifié** — bandeau `AppVisitBandeau` dans `bottom:`, seuls `عام`/`دعاء الجمعة` restent en chips (`home_screen.dart`) |
 | Titre de section `الفترات (إشعارات)` commenté dans `settings_screen` | Phase 3F — les 3 sections sont titrées | ✅ **Corrigé, vérifié** — `settings_screen.dart` (LOT 3.G) titre `التذكير`/`التطبيق` (2 sections désormais, voir §4 Paramètres) |
 | `TextDirection.ltr` forcé sur la barre d'actions du HOME | Supprimé, layout RTL assumé | ✅ **Corrigé, vérifié** — aucune occurrence de `TextDirection.ltr` dans `lib/` (seul un commentaire en atteste l'absence) |
-| `assets/premium/previews/dark_luxe_thumb.png` = stub de 68 octets (1×1 px) | À régénérer **depuis le template déjà validé** — ce n'est pas un redesign | ⏳ **Non résolu, vérifié** — le fichier fait toujours exactement 68 octets au 6 septembre 2026 |
+| `assets/premium/previews/dark_luxe_thumb.png` = stub de 68 octets (1×1 px) | À régénérer **depuis le template déjà validé** — ce n'est pas un redesign | ✅ **Corrigé, vérifié (LOT 3.L, `ad6fee7`)** — régénéré par réduction fidèle du template PNG complet (`assets/premium/templates/dark_luxe.png`), plus un stub ; les 3 previews (`dark_luxe_thumb.png`, `emerald_thumb.png`, `white_elegant_thumb.png`) suivent désormais la même méthode |
 | `main.dart` : `ThemeData.light()`/`dark()` sans personnalisation → deux identités visuelles | Le `ThemeData` unique issu de la Phase 2 est le prérequis de tout le travail visuel | ✅ **Corrigé, vérifié** — `AppTheme.light`/`AppTheme.dark` (`theme/app_theme.dart`) unique, branché dans `main.dart` |
 
 ---
@@ -547,7 +549,7 @@ Ne pas rouvrir lors de l'implémentation :
 - ~~**Écran de lecture d'un douʿā ouvert depuis la Recherche ou les Favoris** — cité comme destination, jamais spécifié comme écran.~~ ✅ **Entièrement résolu (LOT 3.I, `1329865`)** — voir la section « DuaReadScreen » (§4) : spécifié, implémenté et branché depuis Recherche **et** Favoris. `DuaReadOrigin` supprimé (devenu inutile).
 - **Multi-personnes en mode visite** (variantes C/E de l'analyse d'architecture) — la Phase 3C spécifie un écran de lecture unique **sans** chips de personnes ni sélecteur. La question est de fait close par la spec, et confirmée par le code publié (`grave_visit_read_screen.dart`, `e63f4c8`) — mais n'a jamais été formellement arbitrée en tant que telle.
 - **`مشاركة التطبيق`** (partage de l'app elle-même) — ⏳ **nouvellement identifié** : code mort dans `home_screen.dart` (`_shareAppOnWhatsApp`, jamais appelé), retiré du menu `⋮` (voir §1) sans qu'une décision explicite de suppression ou de re-rattachement ait été prise.
-- **Ordre Onboarding** — 🔒 décision verrouillée (`لمن تدعو؟` → `تذكير يومي؟`, voir §4 Onboarding) **non encore répercutée dans le code**, qui implémente toujours l'ordre inverse (LOT 3.E.1). Lot de code à prévoir.
+- ~~**Ordre Onboarding** — 🔒 décision verrouillée (`لمن تدعو؟` → `تذكير يومي؟`, voir §4 Onboarding) non encore répercutée dans le code, qui implémente toujours l'ordre inverse (LOT 3.E.1). Lot de code à prévoir.~~ ✅ **Résolu (LOT 3.H, `0cc0b24`)** — l'ordre verrouillé est appliqué dans `lib/screens/onboarding_screen.dart` depuis ce commit, antérieur au précédent commit de référence de ce document (`3cee368`). Voir §4 Onboarding.
 
 ### 🟡 État de l'App Icon — à connaître
 
@@ -611,9 +613,9 @@ fond **identique au HOME** (`#FFFBF1` Light / `#16211C` Dark) · icône centrée
 
 ---
 
-## 9. État réel de publication et éléments ouverts (mise à jour du 7 septembre 2026 ; complétée le 8 septembre 2026 — LOT 3.J)
+## 9. État réel de publication et éléments ouverts (mise à jour du 7 septembre 2026 ; complétée le 8 septembre 2026 — LOT 3.J ; resynchronisée le 9 septembre 2026 — LOT 3.N, après LOT 3.L)
 
-Synthèse vérifiée par lecture du code et de l'historique Git jusqu'au commit `3cee368` (branche `github-migration`, remote `github-app`). Fait foi sur toute section antérieure en cas de contradiction.
+Synthèse vérifiée par lecture du code et de l'historique Git jusqu'au commit `ad6fee7` (branche `github-migration`, remote `github-app`). Fait foi sur toute section antérieure en cas de contradiction.
 
 ### A. Écrans / lots réellement terminés et publiés
 
@@ -623,17 +625,20 @@ Synthèse vérifiée par lecture du code et de l'historique Git jusqu'au commit 
 | HOME | `e63f4c8` | ✅ |
 | دعاء زيارة القبر (`GraveVisitReadScreen`) | `e63f4c8` | ✅ (sauf wake lock, toujours ⏳) |
 | Recherche | `902c397` | ✅ |
-| Onboarding + Person Selection | `222ea12` | ✅ implémenté — ⚠️ ordre des 2 écrans à inverser (voir §4 Onboarding, décision verrouillée §B) |
+| Onboarding + Person Selection | `222ea12` | ✅ implémenté (ordre des 2 écrans corrigé ultérieurement — voir lignes LOT 3.H/3.K ci-dessous) |
 | Favoris | `b0953b7` | ✅ |
 | Paramètres (LOT 3.G) | `b44f700` | ✅ |
 | Police IBM Plex Sans Arabic embarquée | `dea47c1` | ✅ |
 | `DuaReadScreen` (LOT 3.I — carte hero, `duaLong`, ♥ en pied, `showAppToast`, branché depuis Recherche **et** Favoris avec resynchronisation, `DuaReadOrigin` supprimé) | `1329865` | ✅ |
 | Suppression du fondu de bord du HOME (LOT 3.I.B — `ShaderMask`/`LinearGradient`/`BlendMode.dstIn` retirés de `_fadingDuaScroll`, texte pleinement opaque) | `7d6e015` | ✅ |
 | Suppression du fondu de bord de دعاء زيارة القبر (LOT 3.J — `ShaderMask`/`shaderCallback`/`LinearGradient`/`BlendMode.dstIn`/`_fadeHeight` retirés de `_FadingDuaText`, texte pleinement opaque) | `3cee368` | ✅ |
+| Correction de l'ordre Onboarding (`لمن تدعو؟` → `تذكير يومي؟`, conforme à la décision verrouillée §4) — LOT 3.H | `0cc0b24` | ✅ |
+| Rétablissement du sous-titre dynamique de l'étape rappel (« reprenant la première personne cochée ») — LOT 3.K | `9c0aa4c` | ✅ |
+| Partage Premium — pipeline d'export corrigé (`OverflowBox`, `RenderRepaintBoundary` = `fixedTemplateSize`), 3 previews réelles régénérées, Bottom Sheet repositionné au-dessus de la navigation système — LOT 3.L | `ad6fee7` | ✅ |
 
 ### B. Décisions nouvellement verrouillées par ce lot documentaire
 
-1. 🔒 **Ordre Onboarding définitif :** `لمن تدعو؟` → `تذكير يومي؟`. Toute référence à l'ordre inverse est obsolète. **Non encore répercuté dans le code** (voir §4 Onboarding).
+1. 🔒 **Ordre Onboarding définitif :** `لمن تدعو؟` → `تذكير يومي؟`. Toute référence à l'ordre inverse est obsolète. ✅ **Répercuté dans le code depuis le LOT 3.H (`0cc0b24`)** — antérieur au précédent commit de référence de cette section (`3cee368`) ; le retard constaté jusqu'au LOT 3.M était documentaire, pas applicatif (voir §4 Onboarding).
 2. 🔒 **Chiffres occidentaux 0-9** dans toute l'interface fonctionnelle (heures, valeurs de paramètres, compteurs, nombres, dates) — exception stricte pour le contenu religieux original, jamais modifié pour s'y conformer. **Déjà conforme dans le code publié.**
 
 ### C. Éléments confirmés ❌ supprimés (à ne pas réintroduire)
@@ -651,17 +656,15 @@ Synthèse vérifiée par lecture du code et de l'historique Git jusqu'au commit 
 
 Aucun élément déjà verrouillé n'est rouvert ici — seuls des points effectivement non tranchés ou non implémentés sont listés, chacun vérifié dans le code au moment de cette mise à jour :
 
-1. **Ordre Onboarding** — décision verrouillée (§B.1) non encore appliquée dans `lib/screens/onboarding_screen.dart`. Lot de code à prévoir, avec réévaluation de la conséquence documentée (sous-titre de l'étape rappel).
-2. **`مشاركة التطبيق`** — code mort (`_shareAppOnWhatsApp` dans `home_screen.dart`), non accessible depuis aucune UI. À trancher : suppression définitive ou re-rattachement à un point d'entrée.
-3. **Wake lock** en mode visite (دعاء زيارة القبر) — toujours non implémenté, arbitrage d'usage jamais formellement tranché.
-4. **Paysage du HOME** (colonne latérale 108 dp) — toujours provisoire, non re-vérifié visuellement dans cet audit.
-5. **`dark_luxe_thumb.png`** — toujours un stub de 68 octets, jamais régénéré depuis le template validé.
-6. **رمضان** (374 douʿās) — toujours hors périmètre, jamais tranché.
-7. **Déclinaison Dark de l'App Icon** — toujours non produite.
-8. **Contenu de `عن التطبيق`** — implémenté comme lien externe uniquement ; le contenu de cette page reste hors du dépôt Flutter.
+1. **`مشاركة التطبيق`** — code mort (`_shareAppOnWhatsApp` dans `home_screen.dart`), non accessible depuis aucune UI. À trancher : suppression définitive ou re-rattachement à un point d'entrée.
+2. **Wake lock** en mode visite (دعاء زيارة القبر) — toujours non implémenté, arbitrage d'usage jamais formellement tranché.
+3. **Paysage du HOME** (colonne latérale 108 dp) — toujours provisoire, non re-vérifié visuellement dans cet audit.
+4. **رمضان** (374 douʿās) — toujours hors périmètre, jamais tranché.
+5. **Déclinaison Dark de l'App Icon** — toujours non produite.
+6. **Contenu de `عن التطبيق`** — implémenté comme lien externe uniquement ; le contenu de cette page reste hors du dépôt Flutter.
 
-Aucun de ces 8 points ne bloque l'un des écrans déjà publiés — ce sont des compléments ou des corrections localisées, pas des refontes. Le branchement Favoris → `DuaReadScreen`, précédemment listé ici, est **résolu** (LOT 3.I, `1329865`) — voir §4 « DuaReadScreen ». Le fondu de bord de دعاء زيارة القبر, précédemment listé ici comme 9ᵉ point (« non uniformisé »), est **résolu** (LOT 3.J, `3cee368`) — voir §4 « دعاء زيارة القبر » et le tableau A ci-dessus. Les trois écrans à texte religieux long (HOME, `DuaReadScreen`, دعاء زيارة القبر) appliquent désormais uniformément la règle « aucun fade sur le texte religieux ».
+Aucun de ces 6 points ne bloque l'un des écrans déjà publiés — ce sont des compléments ou des corrections localisées, pas des refontes. Le branchement Favoris → `DuaReadScreen`, précédemment listé ici, est **résolu** (LOT 3.I, `1329865`) — voir §4 « DuaReadScreen ». Le fondu de bord de دعاء زيارة القبر, précédemment listé ici (« non uniformisé »), est **résolu** (LOT 3.J, `3cee368`) — voir §4 « دعاء زيارة القبر » et le tableau A ci-dessus. Les trois écrans à texte religieux long (HOME, `DuaReadScreen`, دعاء زيارة القبر) appliquent désormais uniformément la règle « aucun fade sur le texte religieux ». **L'ordre Onboarding**, précédemment listé ici, est **résolu** (LOT 3.H, `0cc0b24` — antérieur au précédent commit de référence de cette section, `3cee368` ; le retard constaté jusqu'au LOT 3.M était documentaire, pas applicatif) ; le sous-titre dynamique de l'étape rappel a été rétabli en cohérence (LOT 3.K, `9c0aa4c`) — voir §4 « Onboarding ». **`dark_luxe_thumb.png`**, précédemment listé ici, est **résolu** (LOT 3.L, `ad6fee7`) — les 3 previews sont désormais de vraies réductions des templates complets, et le pipeline d'export Premium Share (dimensionnement hors-écran via `OverflowBox`, Bottom Sheet repositionné au-dessus de la navigation système) est également résolu par ce même lot — voir §4 « Partage Premium ».
 
 ---
 
-*Document de continuité. Les sections 1 à 8 restent la spécification et le plan d'origine (2 septembre 2026, historique). La section 9 est la mise à jour vivante synchronisée avec le code et Git (7 septembre 2026) et prévaut en cas de contradiction. Toute affirmation d'état d'implémentation de ce document est traçable soit aux documents du §0, soit à une lecture directe du code/commit citée en référence.*
+*Document de continuité. Les sections 1 à 8 restent la spécification et le plan d'origine (2 septembre 2026, historique). La section 9 est la mise à jour vivante synchronisée avec le code et Git (7 septembre 2026 ; complétée 8 septembre — LOT 3.J ; resynchronisée 9 septembre — LOT 3.N) et prévaut en cas de contradiction. Toute affirmation d'état d'implémentation de ce document est traçable soit aux documents du §0, soit à une lecture directe du code/commit citée en référence.*
