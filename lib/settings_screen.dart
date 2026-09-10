@@ -2,6 +2,7 @@
 import 'package:flutter/foundation.dart' show kDebugMode, visibleForTesting;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:workmanager/workmanager.dart' as wm;
 import 'package:url_launcher/url_launcher.dart';
 
@@ -196,6 +197,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
   static const _eveningTime = TimeOfDay(hour: 20, minute: 0);
   static const _fridayTime = TimeOfDay(hour: 9, minute: 0);
 
+  /// Texte de partage validé (LOT 3.O — « مشاركة التطبيق »). Mécanisme natif
+  /// uniquement (`Share.share`), aucune logique spécifique à une app tierce
+  /// (remplace l'ancienne intégration WhatsApp de `home_screen.dart`,
+  /// supprimée par ce lot).
+  static const _shareAppText =
+      'اللَّهُمَّ ارْحَمْ أَبِي\n'
+      'تطبيق أدعية لوالدي الميت 🤍\n'
+      '\n'
+      'شارك الأجر مع من تحب:\n'
+      'https://play.google.com/store/apps/details?id=com.joumane.allahomairhamabi';
+
   String _selectedTheme = 'system';
 
   bool _enableMorning = true;
@@ -308,6 +320,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  /// « مشاركة التطبيق » (LOT 3.O) — distincte du Partage Premium
+  /// (`مشاركة كصورة`, image d'un dou'a). Mécanisme natif de la plateforme
+  /// uniquement (`Share.share`, déjà utilisé ailleurs dans le projet pour le
+  /// dou'a — `home_screen.dart`, `dua_read_screen.dart`), aucune dépendance
+  /// nouvelle, aucune logique propre à une app tierce.
+  Future<void> _shareApp() async {
+    await Share.share(_shareAppText);
+  }
+
   Future<void> _openAbout() async {
     final uri = Uri.parse(
       'https://rahmaapps.github.io/allahomairhamabi/',
@@ -392,6 +413,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                           const _RowDivider(),
                           _SettingsLinkRow(label: 'عن التطبيق', onTap: _openAbout),
+                          const _RowDivider(),
+                          _SettingsLinkRow(label: 'مشاركة التطبيق', onTap: _shareApp),
                         ],
                       ),
                     ),

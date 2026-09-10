@@ -7,7 +7,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // Clipboard + Haptics
 import 'package:flutter/rendering.dart'; // RenderRepaintBoundary
 import 'package:share_plus/share_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:in_app_review/in_app_review.dart';
 
 import 'dua_repository.dart';
@@ -49,14 +48,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   //Suffixe des textes copiés ou partagés
   static const String _ATTR_SUFFIX_AR =
       '\n\n— من تطبيق اللَّهُمَّ ارْحَمْ أَبِي —';
-
-  // Lien public de l'application (remplace par l'URL finale Play Store / AppGallery / site)
-  static const String _APP_LINK =
-      'https://play.google.com/store/apps/details?id=com.joumane.allahomairhamabi';
-
-// Message court pour partager l'app (WhatsApp / autres)
-  static const String _APP_SHARE_TEXT =
-      'شارك الأجر – أرسل التطبيق لأهلك:\n$_APP_LINK';
 
   // ===== Filtres =====
   // زيارة القبر a son propre écran dédié (LOT 3.F) — plus jamais atteint via
@@ -309,31 +300,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       textToShare,
       subject: 'دعاء', // objet utilisé par certaines apps (ex: email)
     );
-  }
-
-  Future<void> _shareAppOnWhatsApp() async {
-    final text = _APP_SHARE_TEXT;
-
-    // Encodage URL pour WhatsApp
-    final uri = Uri.parse('whatsapp://send?text=${Uri.encodeComponent(text)}');
-
-    // Si WhatsApp n'est pas installé, on propose un fallback (lien web)
-    if (!await canLaunchUrl(uri)) {
-      // Fallback: partage générique via le ShareSheet (optionnel) ou simple Snack
-      // Ici, on affiche un message amical.
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-                'يبدو أن واتساب غير مُثبت. يمكنك مشاركة هذا الرابط يدويًا.'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
-      return;
-    }
-
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   // ===========================================================================
