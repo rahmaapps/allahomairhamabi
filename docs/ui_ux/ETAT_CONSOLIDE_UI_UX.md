@@ -26,7 +26,7 @@ Tous dans `docs/ui_ux/`. En cas de contradiction, **le document de phase le plus
 | `DESIGN_SYSTEM_PHASE3_HOME.md` | HOME | ✅ **Validé** — écran de référence. 1 point provisoire (paysage) |
 | `DESIGN_SYSTEM_PHASE3A_ONBOARDING.md` | Onboarding 2 écrans | ✅ Spécification close |
 | `DESIGN_SYSTEM_PHASE3B_PERSONNES.md` | Sélection/gestion des personnes | ✅ Spécification close |
-| `DESIGN_SYSTEM_PHASE3C_VISITE_CIMETIERE.md` | دعاء زيارة القبر | ✅ Close **sauf 1 arbitrage bloquant** (wake lock) |
+| `DESIGN_SYSTEM_PHASE3C_VISITE_CIMETIERE.md` | دعاء زيارة القبر | ✅ Close — wake lock tranché : **ne pas l'activer** (voir §9.B) |
 | `DESIGN_SYSTEM_PHASE3D_RECHERCHE.md` | Recherche | ✅ Close — aucun arbitrage en attente |
 | `DESIGN_SYSTEM_PHASE3E_FAVORIS.md` | Favoris | ✅ Close — aucun arbitrage en attente |
 | `DESIGN_SYSTEM_PHASE3F_PARAMETRES.md` | Paramètres | ✅ Close — aucun arbitrage en attente |
@@ -448,18 +448,18 @@ Tests dédiés (`test/dua_read_screen_test.dart`, `test/dua_read_screen_not_foun
 
 </details>
 
-### ✅ دعاء زيارة القبر — close sauf 1 arbitrage
+### ✅ دعاء زيارة القبر — close
 
 - Écran plein, AppBar h 52, `→`, **aucune icône d'action**. Un seul objet : la carte de lecture.
 - Carte `Expanded` · `surface` · `r-hero 24` · `e2` · filet or + ✦ **fixe en tête** (seul ornement, aucune rosace) · attribution `رواه مسلم` fixe en pied.
 - Texte **Lateef 27/2.0** centré, **seul élément défilant**. ~~dégradé de fondu 34 px~~ ❌ **obsolète, contredit par le code publié (LOT 3.J, `3cee368`)** — voir la mise à jour ci-dessous : le texte est désormais pleinement opaque en permanence, coupure nette aux limites du scroll. **Jamais réduit à 320 dp.**
 - **N2 délibérément vide** — le seul écran de l'application dans ce cas.
 - Tablette : largeur de lecture plafonnée à **340 dp**. Paysage : pleine largeur, aucune colonne latérale.
-- ⏳ **Wake lock : non appliqué** (proposition), voir §6.
+- 🔒 **Wake lock : décision verrouillée — ne pas l'activer** (voir §9.B). Aucun mécanisme implémenté, conforme à la décision.
 
-✅ **Implémentation vérifiée et publiée (`e63f4c8`)** : `lib/screens/grave_visit_read_screen.dart` — écran dédié, atteint depuis le bandeau du HOME via une sélection de personne (bottom sheet, voir `home_screen.dart` — `_openGraveVisitPersonPicker`), lecture intégrale scrollable, aucune action (confirmé par `test/grave_visit_read_screen_direct_test.dart` : « aucune action interdite (copie/partage/favori/دعاء آخر), aucune attribution, retour présent »). Traité comme un flux **distinct**, jamais comme une catégorie de douʿās partageable — pas de chip, pas d'onglet, retiré de la rangée de filtres du HOME. ⏳ **Wake lock toujours non implémenté** (aucun package de ce type dans `pubspec.yaml`, aucune référence dans le code) — l'arbitrage reste ouvert, le comportement actuel de facto correspond à la proposition « ne pas l'activer », sans que ce soit une décision formellement tranchée.
+✅ **Implémentation vérifiée et publiée (`e63f4c8`)** : `lib/screens/grave_visit_read_screen.dart` — écran dédié, atteint depuis le bandeau du HOME via une sélection de personne (bottom sheet, voir `home_screen.dart` — `_openGraveVisitPersonPicker`), lecture intégrale scrollable, aucune action (confirmé par `test/grave_visit_read_screen_direct_test.dart` : « aucune action interdite (copie/partage/favori/دعاء آخر), aucune attribution, retour présent »). Traité comme un flux **distinct**, jamais comme une catégorie de douʿās partageable — pas de chip, pas d'onglet, retiré de la rangée de filtres du HOME. ✅ **Wake lock : décision verrouillée — ne pas l'activer** (voir §9.B) — aucun package de ce type dans `pubspec.yaml`, aucune référence dans le code : le comportement actuel est désormais la décision produit officielle, pas un défaut par omission.
 
-✅ **Mise à jour (LOT 3.J, `3cee368`)** : le dégradé de fondu de 34 px (`ShaderMask`/`shaderCallback`/`LinearGradient`/`BlendMode.dstIn`/`_fadeHeight`) a été supprimé de `_FadingDuaText` dans `grave_visit_read_screen.dart`. Le texte religieux est désormais pleinement opaque en permanence, peint avec `cs.onSurface`, coupure nette et naturelle aux limites du scroll — même règle que HOME (LOT 3.I.B, `7d6e015`) et `DuaReadScreen` (LOT 3.I, `1329865`). Conservés à l'identique : `LayoutBuilder`, `SingleChildScrollView`, centrage vertical du texte court, largeur de lecture plafonnée à 340 dp, `TextAlign.center`, `TextDirection.rtl`, `AppTypography.duaBody` (fontSize 27, height 2.0), carte `_GraveVisitCard`, navigation existante. **Seul le wake lock reste un arbitrage ouvert** pour cet écran (voir ⏳ ci-dessus et §9).
+✅ **Mise à jour (LOT 3.J, `3cee368`)** : le dégradé de fondu de 34 px (`ShaderMask`/`shaderCallback`/`LinearGradient`/`BlendMode.dstIn`/`_fadeHeight`) a été supprimé de `_FadingDuaText` dans `grave_visit_read_screen.dart`. Le texte religieux est désormais pleinement opaque en permanence, peint avec `cs.onSurface`, coupure nette et naturelle aux limites du scroll — même règle que HOME (LOT 3.I.B, `7d6e015`) et `DuaReadScreen` (LOT 3.I, `1329865`). Conservés à l'identique : `LayoutBuilder`, `SingleChildScrollView`, centrage vertical du texte court, largeur de lecture plafonnée à 340 dp, `TextAlign.center`, `TextDirection.rtl`, `AppTypography.duaBody` (fontSize 27, height 2.0), carte `_GraveVisitCard`, navigation existante. **Le wake lock, seul arbitrage qui restait ouvert pour cet écran, est désormais tranché** (décision : ne pas l'activer — voir §9.B).
 
 ### ✅ Partage Premium — spécification close
 
@@ -533,7 +533,7 @@ Ne pas rouvrir lors de l'implémentation :
 
 | # | Point | Écran | Proposition en attente |
 |---|---|---|---|
-| 1 | **Maintien de l'écran allumé pendant la lecture** (wake lock) | Phase 3C | Proposition : **ne pas l'activer**. Signalé comme « réellement bloquant » — arbitrage d'usage, pas de design. |
+| 1 | ~~**Maintien de l'écran allumé pendant la lecture** (wake lock)~~ — ✅ **Tranché** | Phase 3C | ~~Proposition : ne pas l'activer. Signalé comme « réellement bloquant » — arbitrage d'usage, pas de design.~~ **Décision verrouillée : ne pas l'activer** (voir §9.B). |
 | 2 | **Paysage du HOME — colonne latérale de 108 dp** | Phase 3_HOME point 9 | **Retenu à titre provisoire**, à confirmer par vérification visuelle sur téléphone réel. Critère : la largeur de lecture du texte arabe prime. |
 
 ### ⏳ Non bloquant — à juger à l'œil, pas à décider sur le papier
@@ -623,7 +623,7 @@ Synthèse vérifiée par lecture du code et de l'historique Git jusqu'au commit 
 |---|---|---|
 | Fondations Design System (`AppTheme`, tokens, `AppTopBar`, `AppCard` N1/N2, `AppButton`, `AppChip`, `AppSnackbar`) | `902c397` | ✅ |
 | HOME | `e63f4c8` | ✅ |
-| دعاء زيارة القبر (`GraveVisitReadScreen`) | `e63f4c8` | ✅ (sauf wake lock, toujours ⏳) |
+| دعاء زيارة القبر (`GraveVisitReadScreen`) | `e63f4c8` | ✅ (wake lock : décision verrouillée — ne pas l'activer, voir §9.B) |
 | Recherche | `902c397` | ✅ |
 | Onboarding + Person Selection | `222ea12` | ✅ implémenté (ordre des 2 écrans corrigé ultérieurement — voir lignes LOT 3.H/3.K ci-dessous) |
 | Favoris | `b0953b7` | ✅ |
@@ -642,6 +642,7 @@ Synthèse vérifiée par lecture du code et de l'historique Git jusqu'au commit 
 
 1. 🔒 **Ordre Onboarding définitif :** `لمن تدعو؟` → `تذكير يومي؟`. Toute référence à l'ordre inverse est obsolète. ✅ **Répercuté dans le code depuis le LOT 3.H (`0cc0b24`)** — antérieur au précédent commit de référence de cette section (`3cee368`) ; le retard constaté jusqu'au LOT 3.M était documentaire, pas applicatif (voir §4 Onboarding).
 2. 🔒 **Chiffres occidentaux 0-9** dans toute l'interface fonctionnelle (heures, valeurs de paramètres, compteurs, nombres, dates) — exception stricte pour le contenu religieux original, jamais modifié pour s'y conformer. **Déjà conforme dans le code publié.**
+3. 🔒 **Wake lock (دعاء زيارة القبر) : décision verrouillée — ne pas l'activer.** L'écran s'éteint selon le réglage de veille système de l'utilisateur, comme tous les autres écrans de lecture de l'app (HOME, `DuaReadScreen`) — aucun traitement différencié. ✅ **Conforme au code publié** — aucun mécanisme de wake lock implémenté (`lib/screens/grave_visit_read_screen.dart` : aucun `dispose()`, aucun `WidgetsBindingObserver` ; aucun package `wakelock`/`wakelock_plus` dans `pubspec.yaml`), ce qui correspond exactement à la décision retenue.
 
 ### C. Éléments confirmés ❌ supprimés (à ne pas réintroduire)
 
@@ -658,12 +659,11 @@ Synthèse vérifiée par lecture du code et de l'historique Git jusqu'au commit 
 
 Aucun élément déjà verrouillé n'est rouvert ici — seuls des points effectivement non tranchés ou non implémentés sont listés, chacun vérifié dans le code au moment de cette mise à jour :
 
-1. **Wake lock** en mode visite (دعاء زيارة القبر) — toujours non implémenté, arbitrage d'usage jamais formellement tranché.
-2. **رمضان** (374 douʿās) — toujours hors périmètre, jamais tranché.
-3. **Déclinaison Dark de l'App Icon** — toujours non produite.
-4. **Contenu de `عن التطبيق`** — implémenté comme lien externe uniquement ; le contenu de cette page reste hors du dépôt Flutter.
+1. **رمضان** (374 douʿās) — toujours hors périmètre, jamais tranché.
+2. **Déclinaison Dark de l'App Icon** — toujours non produite.
+3. **Contenu de `عن التطبيق`** — implémenté comme lien externe uniquement ; le contenu de cette page reste hors du dépôt Flutter.
 
-Aucun de ces 4 points ne bloque l'un des écrans déjà publiés — ce sont des compléments ou des corrections localisées, pas des refontes. Le branchement Favoris → `DuaReadScreen`, précédemment listé ici, est **résolu** (LOT 3.I, `1329865`) — voir §4 « DuaReadScreen ». Le fondu de bord de دعاء زيارة القبر, précédemment listé ici (« non uniformisé »), est **résolu** (LOT 3.J, `3cee368`) — voir §4 « دعاء زيارة القبر » et le tableau A ci-dessus. Les trois écrans à texte religieux long (HOME, `DuaReadScreen`, دعاء زيارة القبر) appliquent désormais uniformément la règle « aucun fade sur le texte religieux ». **L'ordre Onboarding**, précédemment listé ici, est **résolu** (LOT 3.H, `0cc0b24` — antérieur au précédent commit de référence de cette section, `3cee368` ; le retard constaté jusqu'au LOT 3.M était documentaire, pas applicatif) ; le sous-titre dynamique de l'étape rappel a été rétabli en cohérence (LOT 3.K, `9c0aa4c`) — voir §4 « Onboarding ». **`dark_luxe_thumb.png`**, précédemment listé ici, est **résolu** (LOT 3.L, `ad6fee7`) — les 3 previews sont désormais de vraies réductions des templates complets, et le pipeline d'export Premium Share (dimensionnement hors-écran via `OverflowBox`, Bottom Sheet repositionné au-dessus de la navigation système) est également résolu par ce même lot — voir §4 « Partage Premium ». **« مشاركة التطبيق »**, précédemment listé ici, est **résolu** (LOT 3.O, `6b11712`) — un partage natif (`Share.share()`) est désormais accessible depuis Paramètres (section `التطبيق`), l'ancien code mort WhatsApp (`_shareAppOnWhatsApp`) a été supprimé. **Le paysage du HOME**, précédemment listé ici comme « colonne latérale 108dp toujours provisoire, non re-vérifiée visuellement », est **résolu et validé sur appareil réel** (LOT HOME LANDSCAPE, `ad14399`) — un rail latéral gauche de 108dp regroupe désormais les chips catégories et la ligne « تدعو لـ… », laissant `HeroCard` occuper l'espace restant ; le portrait reste strictement inchangé.
+Aucun de ces 3 points ne bloque l'un des écrans déjà publiés — ce sont des compléments ou des corrections localisées, pas des refontes. Le branchement Favoris → `DuaReadScreen`, précédemment listé ici, est **résolu** (LOT 3.I, `1329865`) — voir §4 « DuaReadScreen ». Le fondu de bord de دعاء زيارة القبر, précédemment listé ici (« non uniformisé »), est **résolu** (LOT 3.J, `3cee368`) — voir §4 « دعاء زيارة القبر » et le tableau A ci-dessus. Les trois écrans à texte religieux long (HOME, `DuaReadScreen`, دعاء زيارة القبر) appliquent désormais uniformément la règle « aucun fade sur le texte religieux ». **L'ordre Onboarding**, précédemment listé ici, est **résolu** (LOT 3.H, `0cc0b24` — antérieur au précédent commit de référence de cette section, `3cee368` ; le retard constaté jusqu'au LOT 3.M était documentaire, pas applicatif) ; le sous-titre dynamique de l'étape rappel a été rétabli en cohérence (LOT 3.K, `9c0aa4c`) — voir §4 « Onboarding ». **`dark_luxe_thumb.png`**, précédemment listé ici, est **résolu** (LOT 3.L, `ad6fee7`) — les 3 previews sont désormais de vraies réductions des templates complets, et le pipeline d'export Premium Share (dimensionnement hors-écran via `OverflowBox`, Bottom Sheet repositionné au-dessus de la navigation système) est également résolu par ce même lot — voir §4 « Partage Premium ». **« مشاركة التطبيق »**, précédemment listé ici, est **résolu** (LOT 3.O, `6b11712`) — un partage natif (`Share.share()`) est désormais accessible depuis Paramètres (section `التطبيق`), l'ancien code mort WhatsApp (`_shareAppOnWhatsApp`) a été supprimé. **Le paysage du HOME**, précédemment listé ici comme « colonne latérale 108dp toujours provisoire, non re-vérifiée visuellement », est **résolu et validé sur appareil réel** (LOT HOME LANDSCAPE, `ad14399`) — un rail latéral gauche de 108dp regroupe désormais les chips catégories et la ligne « تدعو لـ… », laissant `HeroCard` occuper l'espace restant ; le portrait reste strictement inchangé. **Le wake lock** (دعاء زيارة القبر), précédemment listé ici, est **résolu** — décision verrouillée : **ne pas l'activer** (voir §9.B) ; le comportement actuel (aucun mécanisme implémenté) correspond exactement à cette décision, vérifié dans `lib/screens/grave_visit_read_screen.dart`.
 
 ---
 
