@@ -613,9 +613,9 @@ fond **identique au HOME** (`#FFFBF1` Light / `#16211C` Dark) · icône centrée
 
 ---
 
-## 9. État réel de publication et éléments ouverts (mise à jour du 7 septembre 2026 ; complétée le 8 septembre 2026 — LOT 3.J ; resynchronisée le 9 septembre 2026 — LOT 3.N, après LOT 3.L)
+## 9. État réel de publication et éléments ouverts (mise à jour du 7 septembre 2026 ; complétée le 8 septembre 2026 — LOT 3.J ; resynchronisée le 9 septembre 2026 — LOT 3.N, après LOT 3.L ; resynchronisée le 11 septembre 2026 — LOT 3.P, après LOT 3.O « مشاركة التطبيق » et LOT HOME LANDSCAPE)
 
-Synthèse vérifiée par lecture du code et de l'historique Git jusqu'au commit `ad6fee7` (branche `github-migration`, remote `github-app`). Fait foi sur toute section antérieure en cas de contradiction.
+Synthèse vérifiée par lecture du code et de l'historique Git jusqu'au commit `ad14399` (branche `github-migration`, remote `github-app`). Fait foi sur toute section antérieure en cas de contradiction.
 
 ### A. Écrans / lots réellement terminés et publiés
 
@@ -635,6 +635,8 @@ Synthèse vérifiée par lecture du code et de l'historique Git jusqu'au commit 
 | Correction de l'ordre Onboarding (`لمن تدعو؟` → `تذكير يومي؟`, conforme à la décision verrouillée §4) — LOT 3.H | `0cc0b24` | ✅ |
 | Rétablissement du sous-titre dynamique de l'étape rappel (« reprenant la première personne cochée ») — LOT 3.K | `9c0aa4c` | ✅ |
 | Partage Premium — pipeline d'export corrigé (`OverflowBox`, `RenderRepaintBoundary` = `fixedTemplateSize`), 3 previews réelles régénérées, Bottom Sheet repositionné au-dessus de la navigation système — LOT 3.L | `ad6fee7` | ✅ |
+| « مشاركة التطبيق » — partage natif implémenté (`Share.share()`, accessible depuis Paramètres § `التطبيق`), ancien code mort WhatsApp (`_shareAppOnWhatsApp`) supprimé — LOT 3.O | `6b11712` | ✅ |
+| Paysage HOME — rail latéral gauche 108dp (chips catégories + ligne « تدعو لـ… »), `HeroCard` dans l'espace restant, portrait strictement inchangé, validé sur appareil réel — LOT HOME LANDSCAPE | `ad14399` | ✅ |
 
 ### B. Décisions nouvellement verrouillées par ce lot documentaire
 
@@ -656,15 +658,13 @@ Synthèse vérifiée par lecture du code et de l'historique Git jusqu'au commit 
 
 Aucun élément déjà verrouillé n'est rouvert ici — seuls des points effectivement non tranchés ou non implémentés sont listés, chacun vérifié dans le code au moment de cette mise à jour :
 
-1. **`مشاركة التطبيق`** — code mort (`_shareAppOnWhatsApp` dans `home_screen.dart`), non accessible depuis aucune UI. À trancher : suppression définitive ou re-rattachement à un point d'entrée.
-2. **Wake lock** en mode visite (دعاء زيارة القبر) — toujours non implémenté, arbitrage d'usage jamais formellement tranché.
-3. **Paysage du HOME** (colonne latérale 108 dp) — toujours provisoire, non re-vérifié visuellement dans cet audit.
-4. **رمضان** (374 douʿās) — toujours hors périmètre, jamais tranché.
-5. **Déclinaison Dark de l'App Icon** — toujours non produite.
-6. **Contenu de `عن التطبيق`** — implémenté comme lien externe uniquement ; le contenu de cette page reste hors du dépôt Flutter.
+1. **Wake lock** en mode visite (دعاء زيارة القبر) — toujours non implémenté, arbitrage d'usage jamais formellement tranché.
+2. **رمضان** (374 douʿās) — toujours hors périmètre, jamais tranché.
+3. **Déclinaison Dark de l'App Icon** — toujours non produite.
+4. **Contenu de `عن التطبيق`** — implémenté comme lien externe uniquement ; le contenu de cette page reste hors du dépôt Flutter.
 
-Aucun de ces 6 points ne bloque l'un des écrans déjà publiés — ce sont des compléments ou des corrections localisées, pas des refontes. Le branchement Favoris → `DuaReadScreen`, précédemment listé ici, est **résolu** (LOT 3.I, `1329865`) — voir §4 « DuaReadScreen ». Le fondu de bord de دعاء زيارة القبر, précédemment listé ici (« non uniformisé »), est **résolu** (LOT 3.J, `3cee368`) — voir §4 « دعاء زيارة القبر » et le tableau A ci-dessus. Les trois écrans à texte religieux long (HOME, `DuaReadScreen`, دعاء زيارة القبر) appliquent désormais uniformément la règle « aucun fade sur le texte religieux ». **L'ordre Onboarding**, précédemment listé ici, est **résolu** (LOT 3.H, `0cc0b24` — antérieur au précédent commit de référence de cette section, `3cee368` ; le retard constaté jusqu'au LOT 3.M était documentaire, pas applicatif) ; le sous-titre dynamique de l'étape rappel a été rétabli en cohérence (LOT 3.K, `9c0aa4c`) — voir §4 « Onboarding ». **`dark_luxe_thumb.png`**, précédemment listé ici, est **résolu** (LOT 3.L, `ad6fee7`) — les 3 previews sont désormais de vraies réductions des templates complets, et le pipeline d'export Premium Share (dimensionnement hors-écran via `OverflowBox`, Bottom Sheet repositionné au-dessus de la navigation système) est également résolu par ce même lot — voir §4 « Partage Premium ».
+Aucun de ces 4 points ne bloque l'un des écrans déjà publiés — ce sont des compléments ou des corrections localisées, pas des refontes. Le branchement Favoris → `DuaReadScreen`, précédemment listé ici, est **résolu** (LOT 3.I, `1329865`) — voir §4 « DuaReadScreen ». Le fondu de bord de دعاء زيارة القبر, précédemment listé ici (« non uniformisé »), est **résolu** (LOT 3.J, `3cee368`) — voir §4 « دعاء زيارة القبر » et le tableau A ci-dessus. Les trois écrans à texte religieux long (HOME, `DuaReadScreen`, دعاء زيارة القبر) appliquent désormais uniformément la règle « aucun fade sur le texte religieux ». **L'ordre Onboarding**, précédemment listé ici, est **résolu** (LOT 3.H, `0cc0b24` — antérieur au précédent commit de référence de cette section, `3cee368` ; le retard constaté jusqu'au LOT 3.M était documentaire, pas applicatif) ; le sous-titre dynamique de l'étape rappel a été rétabli en cohérence (LOT 3.K, `9c0aa4c`) — voir §4 « Onboarding ». **`dark_luxe_thumb.png`**, précédemment listé ici, est **résolu** (LOT 3.L, `ad6fee7`) — les 3 previews sont désormais de vraies réductions des templates complets, et le pipeline d'export Premium Share (dimensionnement hors-écran via `OverflowBox`, Bottom Sheet repositionné au-dessus de la navigation système) est également résolu par ce même lot — voir §4 « Partage Premium ». **« مشاركة التطبيق »**, précédemment listé ici, est **résolu** (LOT 3.O, `6b11712`) — un partage natif (`Share.share()`) est désormais accessible depuis Paramètres (section `التطبيق`), l'ancien code mort WhatsApp (`_shareAppOnWhatsApp`) a été supprimé. **Le paysage du HOME**, précédemment listé ici comme « colonne latérale 108dp toujours provisoire, non re-vérifiée visuellement », est **résolu et validé sur appareil réel** (LOT HOME LANDSCAPE, `ad14399`) — un rail latéral gauche de 108dp regroupe désormais les chips catégories et la ligne « تدعو لـ… », laissant `HeroCard` occuper l'espace restant ; le portrait reste strictement inchangé.
 
 ---
 
-*Document de continuité. Les sections 1 à 8 restent la spécification et le plan d'origine (2 septembre 2026, historique). La section 9 est la mise à jour vivante synchronisée avec le code et Git (7 septembre 2026 ; complétée 8 septembre — LOT 3.J ; resynchronisée 9 septembre — LOT 3.N) et prévaut en cas de contradiction. Toute affirmation d'état d'implémentation de ce document est traçable soit aux documents du §0, soit à une lecture directe du code/commit citée en référence.*
+*Document de continuité. Les sections 1 à 8 restent la spécification et le plan d'origine (2 septembre 2026, historique). La section 9 est la mise à jour vivante synchronisée avec le code et Git (7 septembre 2026 ; complétée 8 septembre — LOT 3.J ; resynchronisée 9 septembre — LOT 3.N ; resynchronisée 11 septembre — LOT 3.P) et prévaut en cas de contradiction. Toute affirmation d'état d'implémentation de ce document est traçable soit aux documents du §0, soit à une lecture directe du code/commit citée en référence.*
