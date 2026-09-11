@@ -77,6 +77,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // La zone de texte défilant s'arrête au-dessus, jamais derrière.
   static const double _cardFooterReservedHeight = 56;
 
+  // Rail paysage (LOT HOME LANDSCAPE — décision UX validée) : largeur de
+  // référence du rail latéral regroupant les chips catégories et la ligne
+  // « pour qui » en paysage. Remplace les anciens correctifs de compression
+  // (padding/gaps resserrés, interligne réduit, `_cardFooterReservedHeightLandscape`)
+  // — devenus inutiles une fois `Expanded(AppCard)` libéré de ces éléments,
+  // qui ne rivalisent plus avec sa hauteur puisqu'ils vivent désormais à
+  // côté d'elle, pas au-dessus.
+  static const double _landscapeRailWidth = 108;
+
   @override
   void initState() {
     super.initState();
@@ -787,8 +796,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
-  Widget _buildPersonsLine(ColorScheme cs, bool isDark) {
+  /// Ligne « pour qui » — [compact] l'empile verticalement (résumé puis
+  /// action) au lieu de la disposer sur une seule rangée horizontale :
+  /// utilisé uniquement dans le rail paysage (108dp de large), trop étroit
+  /// pour la rangée horizontale historique. Comportement, textes et style
+  /// (`AppTypography.body`/`bodyStrong`, jamais réduits) strictement
+  /// identiques au mode normal — seule l'orientation de l'empilement change.
+  Widget _buildPersonsLine(
+    ColorScheme cs,
+    bool isDark, {
+    bool compact = false,
+  }) {
     final hasPersons = personsData.isNotEmpty;
+    final bool isPlural = hasPersons && personsData.length > 1;
     final String summary = !hasPersons
         ? 'ادعُ لمن تحب'
         : personsData.length == 1
@@ -796,6 +816,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             : 'تدعو لـ ${personsData.length} أشخاص';
     final String action = hasPersons ? 'تغيير' : 'اختيار';
     final goldText = isDark ? AppColorsDark.gold : AppColorsLight.goldText;
+    final bodyStyle = AppTypography.body.copyWith(color: cs.onSurface);
 
     // Pas de hauteur fixe (auparavant SizedBox(height: 20)) : la hauteur de
     // ligne réelle de AppTypography.body/bodyStrong à 15px (~22-26dp selon
@@ -803,24 +824,74 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     // arabe (glyphes déformés). La ligne se dimensionne désormais à son
     // contenu ; les espacements 12dp au-dessus/en dessous (déjà en place
     // dans build()) portent le rythme vertical, pas une hauteur imposée ici.
+    final summaryText = Text(
+      summary,
+      textAlign: TextAlign.center,
+      textDirection: TextDirection.rtl,
+      style: bodyStyle,
+    );
+    final actionText = GestureDetector(
+      onTap: _openPersonSelection,
+      child: Text(
+        action,
+        textAlign: TextAlign.center,
+        textDirection: TextDirection.rtl,
+        style: AppTypography.bodyStrong.copyWith(color: goldText),
+      ),
+    );
+
+    if (compact) {
+      // Rail paysage (108dp) : la rangée horizontale historique déborderait
+      // — empilement vertical, même textes/styles.
+      //
+      // Cas pluriel (« تدعو لـ N أشخاص ») : au lieu de laisser le
+      // retour à la ligne naturel couper au hasard (l'algorithme remplit
+      // chaque ligne au maximum, donc casse typiquement entre le chiffre et
+      // « أشخاص » — « تدعو لـ 5 » / « أشخاص », observé sur appareil réel),
+      // le point de séparation logique est forcé entre « تدعو لـ » et
+      // « N أشخاص » via deux `Text` distincts : le second reste un `Text`
+      // normal (espace normal, pas de séparateur insécable, aucun
+      // `maxLines`) — s'il ne tient pas non plus (grand nombre + fort
+      // `textScaler`, jusqu'à 1,6× — §3 Design System), le retour à la
+      // ligne naturel de Flutter reste le filet de sécurité, exactement
+      // comme avant ce correctif.
+      final Widget compactSummary = isPlural
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'تدعو لـ',
+                  textAlign: TextAlign.center,
+                  textDirection: TextDirection.rtl,
+                  style: bodyStyle,
+                ),
+                Text(
+                  '${personsData.length} أشخاص',
+                  textAlign: TextAlign.center,
+                  textDirection: TextDirection.rtl,
+                  style: bodyStyle,
+                ),
+              ],
+            )
+          : summaryText;
+
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          compactSummary,
+          const SizedBox(height: AppSpacing.xs),
+          actionText,
+        ],
+      );
+    }
+
     return Row(
       textDirection: TextDirection.rtl,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text(
-          summary,
-          textDirection: TextDirection.rtl,
-          style: AppTypography.body.copyWith(color: cs.onSurface),
-        ),
+        summaryText,
         const SizedBox(width: AppSpacing.sm),
-        GestureDetector(
-          onTap: _openPersonSelection,
-          child: Text(
-            action,
-            textDirection: TextDirection.rtl,
-            style: AppTypography.bodyStrong.copyWith(color: goldText),
-          ),
-        ),
+        actionText,
       ],
     );
   }
@@ -864,7 +935,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   /// réduisait l'alpha réelle du texte religieux, cause confirmée par audit
   /// dédié). Coupure nette naturelle aux limites du scroll ; texte toujours
   /// pleinement opaque, typographie et scroll inchangés.
-  Widget _fadingDuaScroll(ColorScheme cs) {
+  Widget _fadingDuaScroll(ColorScheme cs, bool isLandscape) {
+    // Correction responsive paysage (LOT HOME LANDSCAPE, suite — audit
+    // dédié) : `fontSize: 29` et `height: 2.05` restent strictement
+    // inchangés (texte sacré jamais réduit). Le seul ajustement est
+    // `applyHeightToFirstAscent: false`, qui retire le "leading" que
+    // `height` ajoute par défaut AU-DESSUS de la toute première ligne
+    // (`dart:ui` `TextHeightBehavior`, défaut `true`) — sans toucher
+    // l'interligne des lignes suivantes. En paysage, le viewport de ce
+    // `SingleChildScrollView` peut être si réduit que ce leading (~12dp)
+    // couvre à lui seul tout l'espace visible à l'offset de défilement
+    // initial (0.0) : l'encre de la première ligne n'apparaît qu'après un
+    // geste de défilement, et alors tronquée (cause confirmée par audit
+    // dédié, captures à l'appui). Ce réglage n'a aucun effet en portrait,
+    // où le viewport est déjà largement suffisant.
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       child: Text(
@@ -872,6 +956,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         textAlign: TextAlign.center,
         textDirection: TextDirection.rtl,
         style: AppTypography.duaBody.copyWith(color: cs.onSurface),
+        textHeightBehavior: isLandscape
+            ? const TextHeightBehavior(applyHeightToFirstAscent: false)
+            : null,
       ),
     );
   }
@@ -964,6 +1051,146 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     // déjà utilisés par AppBarTheme lui-même (LOT 1A).
     final appBarForeground = isDark ? AppColorsDark.textPrimary : AppColorsLight.onPrimary;
 
+    // Rail paysage (LOT HOME LANDSCAPE — décision UX validée) : en paysage,
+    // les chips catégories et la ligne « pour qui » quittent la colonne
+    // verticale pour un rail latéral gauche de 108dp, à côté de la carte au
+    // lieu d'empiler au-dessus d'elle — elles ne rivalisent donc plus pour
+    // la hauteur de `Expanded(AppCard)`. C'est une adaptation responsive du
+    // layout existant (mêmes widgets, même Column pour le portrait,
+    // réutilisés tels quels), pas une nouvelle navigation. Le portrait
+    // reste structurellement identique à avant ce lot (aucune branche
+    // paysage ne s'y applique).
+    final isLandscape = MediaQuery.orientationOf(context) == Orientation.landscape;
+
+    final categoryChipGeneral = AppChip(
+      label: 'عام',
+      selected: _activeCategory == 'normal',
+      onTap: () => _setCategory('normal'),
+    );
+    final categoryChipFriday = AppChip(
+      label: 'دعاء الجمعة',
+      selected: _activeCategory == 'friday',
+      onTap: () => _setCategory('friday'),
+    );
+
+    // ---- Carte du douʿā (N1) — inchangée : padding/filet/rosace de
+    // `AppCard`, `_cardFooterReservedHeight` (56, jamais réduit ici),
+    // `_fadingDuaScroll` (Lateef 29, scroll inchangé). Construite une seule
+    // fois puis placée soit dans la Column portrait, soit dans la Column
+    // principale du Row paysage.
+    final duaCard = Expanded(
+      child: SlideTransition(
+        position: _slide,
+        child: FadeTransition(
+          opacity: _fade,
+          child: AppCard(
+            child: Stack(
+              children: [
+                // Zone de texte contrainte pour exclure structurellement la
+                // bande du pied de carte (♡ + « دعاء آخر ») : à largeur/
+                // hauteur réduites, un douʿā long ne peut plus passer
+                // derrière le bouton, quelle que soit sa longueur — plutôt
+                // qu'un simple chevauchement laissé au hasard du Center.
+                Positioned.fill(
+                  bottom: _cardFooterReservedHeight,
+                  child: Center(
+                    child: _fadingDuaScroll(cs, isLandscape),
+                  ),
+                ),
+
+                // Pied de carte : ♡ + « دعاء آخر » — RTL naturel (aucun
+                // TextDirection.ltr forcé).
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: Row(
+                    textDirection: TextDirection.rtl,
+                    children: [
+                      _buildFavoriteButton(cs, isDark),
+                      const Spacer(),
+                      AppButton(
+                        role: AppButtonRole.secondary,
+                        icon: Icons.skip_next_rounded,
+                        label: 'دعاء آخر',
+                        onPressed: _showNextFromDeck,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    // ---- نسخ / مشاركة — inchangés (hauteur 48, bascule horizontale/
+    // verticale existante), placés sous la carte dans les deux orientations.
+    final copyShareRow = _buildCopyShareActions();
+
+    final Widget bodyContent = isLandscape
+        ? Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // ---- Rail latéral gauche (108dp) : chips + ligne « pour qui »
+              SizedBox(
+                width: _landscapeRailWidth,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    categoryChipGeneral,
+                    const SizedBox(height: AppSpacing.sm),
+                    categoryChipFriday,
+                    const SizedBox(height: AppSpacing.md),
+                    _buildPersonsLine(cs, isDark, compact: true),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              // ---- Carte + boutons dans tout l'espace restant ----
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    duaCard,
+                    const SizedBox(height: AppSpacing.md),
+                    copyShareRow,
+                  ],
+                ),
+              ),
+            ],
+          )
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // ---- Chips catégories (2, 50% chacune) ----
+              Row(
+                children: [
+                  Expanded(child: categoryChipGeneral),
+                  // Gap chips : le document indique 10 (§3 Espacements)
+                  // mais l'échelle base-4 qu'il fixe au même paragraphe
+                  // l'exclut explicitement (« aucune autre valeur ... pas
+                  // de 6, 10, 14, 18 »). Contradiction interne au document
+                  // — signalée dans le rapport, valeur d'échelle la plus
+                  // proche retenue (8) plutôt qu'un 10 hors échelle.
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(child: categoryChipFriday),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.md),
+
+              // ---- Ligne « pour qui » (pas un bouton) ----
+              _buildPersonsLine(cs, isDark),
+              const SizedBox(height: AppSpacing.md),
+
+              duaCard,
+              const SizedBox(height: AppSpacing.md),
+
+              copyShareRow,
+            ],
+          );
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Stack(
@@ -1020,97 +1247,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   AppSpacing.xl,
                   AppSpacing.lg,
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // ---- Chips catégories (2, 50% chacune) ----
-                    Row(
-                      children: [
-                        Expanded(
-                          child: AppChip(
-                            label: 'عام',
-                            selected: _activeCategory == 'normal',
-                            onTap: () => _setCategory('normal'),
-                          ),
-                        ),
-                        // Gap chips : le document indique 10 (§3
-                        // Espacements) mais l'échelle base-4 qu'il fixe au
-                        // même paragraphe l'exclut explicitement (« aucune
-                        // autre valeur ... pas de 6, 10, 14, 18 »).
-                        // Contradiction interne au document — signalée dans
-                        // le rapport, valeur d'échelle la plus proche
-                        // retenue (8) plutôt qu'un 10 hors échelle.
-                        const SizedBox(width: AppSpacing.sm),
-                        Expanded(
-                          child: AppChip(
-                            label: 'دعاء الجمعة',
-                            selected: _activeCategory == 'friday',
-                            onTap: () => _setCategory('friday'),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-
-                    // ---- Ligne « pour qui » (20dp, pas un bouton) ----
-                    _buildPersonsLine(cs, isDark),
-                    const SizedBox(height: AppSpacing.md),
-
-                    // ---- Carte du douʿā (N1) ----
-                    Expanded(
-                      child: SlideTransition(
-                        position: _slide,
-                        child: FadeTransition(
-                          opacity: _fade,
-                          child: AppCard(
-                            child: Stack(
-                              children: [
-                                // Zone de texte contrainte pour exclure
-                                // structurellement la bande du pied de carte
-                                // (♡ + « دعاء آخر ») : à largeur/hauteur
-                                // réduites, un douʿā long ne peut plus
-                                // passer derrière le bouton, quelle que soit
-                                // sa longueur — plutôt qu'un simple
-                                // chevauchement laissé au hasard du Center.
-                                Positioned.fill(
-                                  bottom: _cardFooterReservedHeight,
-                                  child: Center(
-                                    child: _fadingDuaScroll(cs),
-                                  ),
-                                ),
-
-                                // Pied de carte : ♡ + « دعاء آخر » — RTL
-                                // naturel (aucun TextDirection.ltr forcé).
-                                Positioned(
-                                  left: 0,
-                                  right: 0,
-                                  bottom: 0,
-                                  child: Row(
-                                    textDirection: TextDirection.rtl,
-                                    children: [
-                                      _buildFavoriteButton(cs, isDark),
-                                      const Spacer(),
-                                      AppButton(
-                                        role: AppButtonRole.secondary,
-                                        icon: Icons.skip_next_rounded,
-                                        label: 'دعاء آخر',
-                                        onPressed: _showNextFromDeck,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-
-                    // ---- نسخ / مشاركة (paire, largeurs égales par défaut) ----
-                    _buildCopyShareActions(),
-                  ],
-                ),
+                child: bodyContent,
               ),
             ),
           ),
