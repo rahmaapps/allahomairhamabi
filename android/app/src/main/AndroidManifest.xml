@@ -5,12 +5,6 @@
     <!-- Android 13+ : permission de notifications (runtime) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <queries>
-        <!-- Nécessaire pour vérifier si WhatsApp est installé -->
-        <package android:name="com.whatsapp" />
-        <package android:name="com.whatsapp.w4b" />  <!-- WhatsApp Business -->
-    </queries>
-
     <application
 
         android:icon="@mipmap/ic_launcher"
