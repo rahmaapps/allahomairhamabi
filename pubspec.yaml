@@ -2,7 +2,7 @@ name: test_1
 description: "App Father's Douaas"
 publish_to: 'none'
 
-version: 1.1+4
+version: 1.1.0+4
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
