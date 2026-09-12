@@ -26,8 +26,8 @@ android {
         applicationId = "com.joumane.allahomairhamabi"
         minSdk = flutter.minSdkVersion
         targetSdk = 36
-        versionCode = 4
-        versionName = "1.1"
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
     }
 
     // ✅ Java 17 + desugaring
