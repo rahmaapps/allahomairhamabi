@@ -1,9 +1,7 @@
 // lib/settings_screen.dart
-import 'package:flutter/foundation.dart' show kDebugMode, visibleForTesting;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:workmanager/workmanager.dart' as wm;
 import 'package:url_launcher/url_launcher.dart';
 
 import 'notification_service.dart';
@@ -15,50 +13,13 @@ import 'user_prefs.dart';
 import 'widgets/app_bar.dart';
 import 'widgets/app_card.dart';
 
-/// Identifiants uniques pour WorkManager — LOT 3.G : `afternoon` supprimé,
-/// `friday` ajouté (récurrence hebdomadaire, voir [WorkManagerService]).
-class WorkIds {
-  static const morning = 'period_morning';
-  static const evening = 'period_evening';
-  static const friday = 'period_friday';
-
-  /// Ancien identifiant, retiré de l'UI — conservé ici uniquement comme
-  /// référence pour l'annulation de compatibilité, effectuée au démarrage
-  /// de l'app dans `main()` (et non plus dans `SettingsScreen`, pour
-  /// garantir l'annulation même si l'utilisateur ne rouvre jamais
-  /// Paramètres après la mise à jour).
-  static const legacyAfternoon = 'period_afternoon';
-}
-
+/// Conservée uniquement pour compatibilité avec
+/// `test/settings_screen_lot3g_test.dart` (logique pure de replanification
+/// du vendredi, sans dépendance à `workmanager`, retiré du projet — voir
+/// [NotificationService.scheduleWeeklyReminder] pour la planification
+/// réelle des rappels, qui n'a plus aucun rapport avec cette classe).
 class WorkManagerService {
-  static bool _initialized = false;
-
-  static Future<void> _ensureInitialized() async {
-    if (_initialized) return;
-    await wm.Workmanager().initialize(
-      callbackDispatcher,
-      isInDebugMode: kDebugMode,
-    );
-    _initialized = true;
-  }
-
-  static Duration _initialDelayFor(int hour, int minute) {
-    final now = DateTime.now();
-    var scheduled = DateTime(now.year, now.month, now.day, hour, minute);
-    if (!scheduled.isAfter(now)) {
-      scheduled = scheduled.add(const Duration(days: 1));
-    }
-    return scheduled.difference(now);
-  }
-
-  /// Prochaine occurrence **calendaire** de vendredi à `hour:minute` (LOT
-  /// 3.G) — même mécanisme one-off que [scheduleDaily], mais ancré sur la
-  /// vraie date de vendredi la plus proche plutôt que sur un delta fixe
-  /// depuis l'instant d'appel. C'est cette propriété qui évite toute
-  /// dérive : que l'appelant l'invoque pile à l'heure prévue ou avec un
-  /// retard (Android peut retarder l'exécution WorkManager), le résultat
-  /// reste toujours « le prochain vendredi à `hour:minute` », jamais
-  /// « + 7 jours depuis maintenant ».
+  /// Prochaine occurrence **calendaire** de vendredi à `hour:minute`.
   ///
   /// `now` est injectable uniquement pour les tests (`@visibleForTesting`) ;
   /// l'appel réel ne le fournit jamais et utilise `DateTime.now()`.
@@ -73,111 +34,6 @@ class WorkManagerService {
     }
     return scheduled.difference(n);
   }
-
-  static Future<void> scheduleDaily({
-    required String uniqueName,
-    required int hour,
-    required int minute,
-  }) async {
-    await _ensureInitialized();
-    await wm.Workmanager().registerOneOffTask(
-      uniqueName,
-      uniqueName,
-      initialDelay: _initialDelayFor(hour, minute),
-      inputData: {
-        'taskId': uniqueName,
-        'hour': hour,
-        'minute': minute,
-      },
-      existingWorkPolicy: wm.ExistingWorkPolicy.replace,
-      constraints: wm.Constraints(networkType: wm.NetworkType.notRequired),
-      backoffPolicy: wm.BackoffPolicy.linear,
-      backoffPolicyDelay: const Duration(minutes: 5),
-    );
-  }
-
-  /// Planification hebdomadaire (vendredi uniquement).
-  static Future<void> scheduleWeeklyFriday({
-    required String uniqueName,
-    required int hour,
-    required int minute,
-  }) async {
-    await _ensureInitialized();
-    await wm.Workmanager().registerOneOffTask(
-      uniqueName,
-      uniqueName,
-      initialDelay: initialDelayForNextFriday(hour, minute),
-      inputData: {
-        'taskId': uniqueName,
-        'hour': hour,
-        'minute': minute,
-      },
-      existingWorkPolicy: wm.ExistingWorkPolicy.replace,
-      constraints: wm.Constraints(networkType: wm.NetworkType.notRequired),
-      backoffPolicy: wm.BackoffPolicy.linear,
-      backoffPolicyDelay: const Duration(minutes: 5),
-    );
-  }
-
-  static Future<void> cancel(String uniqueName) async {
-    await _ensureInitialized();
-    await wm.Workmanager().cancelByUniqueName(uniqueName);
-  }
-}
-
-@pragma('vm:entry-point')
-void callbackDispatcher() {
-  wm.Workmanager().executeTask((task, inputData) async {
-    try {
-      // ⚠️ Init service de notifications dans l’isolate
-      await NotificationService.ensureInitialized();
-      final id = (inputData?['taskId'] as String?) ?? task;
-      final hour = inputData?['hour'] as int? ?? 7;
-      final minute = inputData?['minute'] as int? ?? 0;
-
-      // Afficher la notification planifiée
-      await NotificationService().showPeriodReminder(
-        periodId: id,
-        hour: hour,
-        minute: minute,
-      );
-
-      // Replanifier : vendredi recalcule la vraie prochaine occurrence
-      // calendaire (jamais un simple +7 jours depuis l'heure d'exécution,
-      // qui dériverait hors du vendredi en cas de retard WorkManager) ;
-      // quotidien sinon, inchangé.
-      Duration nextDelay;
-      if (id == WorkIds.friday) {
-        nextDelay = WorkManagerService.initialDelayForNextFriday(hour, minute);
-      } else {
-        final now = DateTime.now();
-        final next = DateTime(now.year, now.month, now.day, hour, minute)
-            .add(const Duration(days: 1));
-        nextDelay = next.difference(now);
-      }
-
-      await wm.Workmanager().registerOneOffTask(
-        id,
-        id,
-        initialDelay: nextDelay,
-        inputData: {
-          'taskId': id,
-          'hour': hour,
-          'minute': minute,
-        },
-        existingWorkPolicy: wm.ExistingWorkPolicy.replace,
-        constraints: wm.Constraints(networkType: wm.NetworkType.notRequired),
-      );
-
-      return Future.value(true);
-    } catch (e, st) {
-      if (kDebugMode) {
-        // ignore: avoid_print
-        print('[WorkManager] Erreur tâche "$task": $e\n$st');
-      }
-      return Future.value(false);
-    }
-  });
 }
 
 /// Paramètres — spécification consolidée (docs/ui_ux/ETAT_CONSOLIDE_UI_UX.md,
@@ -270,53 +126,111 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await _syncBackgroundSchedules();
   }
 
+  /// À l'activation d'un rappel (jamais au changement d'heure d'un rappel
+  /// déjà actif), propose l'alarme exacte si elle n'est pas déjà accordée
+  /// — ouvre l'écran système « Alarmes et rappels »
+  /// (`NotificationService.requestExactAlarmsPermission`). N'a aucun effet
+  /// bloquant : que l'utilisateur accorde ou non, l'activation se poursuit
+  /// normalement ensuite via `_syncBackgroundSchedules` — qui choisira
+  /// `exactAllowWhileIdle` si accordée, ou le repli `inexactAllowWhileIdle`
+  /// déjà en place sinon (logique inchangée, entièrement dans
+  /// `NotificationService._scheduleZoned`).
+  Future<void> _requestExactAlarmIfNeeded() async {
+    final notifications = NotificationService();
+    if (!await notifications.canScheduleExactAlarms()) {
+      await notifications.requestExactAlarmsPermission();
+    }
+  }
+
   Future<void> _setMorningEnabled(bool v) async {
+    if (v) {
+      await _requestExactAlarmIfNeeded();
+    }
     setState(() => _enableMorning = v);
     await UserPrefs().setMorningEnabled(v);
     await _syncBackgroundSchedules();
   }
 
   Future<void> _setEveningEnabled(bool v) async {
+    if (v) {
+      await _requestExactAlarmIfNeeded();
+    }
     setState(() => _enableEvening = v);
     await UserPrefs().setEveningEnabled(v);
     await _syncBackgroundSchedules();
   }
 
   Future<void> _setFridayEnabled(bool v) async {
+    if (v) {
+      await _requestExactAlarmIfNeeded();
+    }
     setState(() => _enableFriday = v);
     await UserPrefs().setFridayEnabled(v);
     await _syncBackgroundSchedules();
   }
 
+  /// Applique aux rappels natifs l'état actuel de [_enableMorning] /
+  /// [_enableEvening] / [_enableFriday] (+ heures). `NotificationService`
+  /// ne lève jamais d'exception : chaque planification retourne `true`/
+  /// `false` selon le succès réel. En cas d'échec, le rappel concerné est
+  /// explicitement repassé à désactivé (état + préférence persistée) —
+  /// jamais laissé « activé » dans l'UI alors qu'aucune notification n'est
+  /// réellement programmée auprès de l'OS — et l'utilisateur en est informé.
   Future<void> _syncBackgroundSchedules() async {
+    final notifications = NotificationService();
+    var scheduleFailed = false;
+
     if (_enableMorning) {
-      await WorkManagerService.scheduleDaily(
-        uniqueName: WorkIds.morning,
+      final ok = await notifications.scheduleDailyReminder(
+        periodId: 'period_morning',
         hour: _morningTime.hour,
         minute: _morningTime.minute,
       );
+      if (!ok) {
+        scheduleFailed = true;
+        _enableMorning = false;
+        await UserPrefs().setMorningEnabled(false);
+      }
     } else {
-      await WorkManagerService.cancel(WorkIds.morning);
+      await notifications.cancelReminder(NotificationService.notificationIdMorning);
     }
 
     if (_enableEvening) {
-      await WorkManagerService.scheduleDaily(
-        uniqueName: WorkIds.evening,
+      final ok = await notifications.scheduleDailyReminder(
+        periodId: 'period_evening',
         hour: _eveningTime.hour,
         minute: _eveningTime.minute,
       );
+      if (!ok) {
+        scheduleFailed = true;
+        _enableEvening = false;
+        await UserPrefs().setEveningEnabled(false);
+      }
     } else {
-      await WorkManagerService.cancel(WorkIds.evening);
+      await notifications.cancelReminder(NotificationService.notificationIdEvening);
     }
 
     if (_enableFriday) {
-      await WorkManagerService.scheduleWeeklyFriday(
-        uniqueName: WorkIds.friday,
+      final ok = await notifications.scheduleWeeklyReminder(
+        periodId: 'period_friday',
+        weekday: DateTime.friday,
         hour: _fridayTime.hour,
         minute: _fridayTime.minute,
       );
+      if (!ok) {
+        scheduleFailed = true;
+        _enableFriday = false;
+        await UserPrefs().setFridayEnabled(false);
+      }
     } else {
-      await WorkManagerService.cancel(WorkIds.friday);
+      await notifications.cancelReminder(NotificationService.notificationIdFriday);
+    }
+
+    if (scheduleFailed && mounted) {
+      setState(() {}); // reflète l'état corrigé (rappel repassé à désactivé)
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تعذّرت برمجة أحد التذكيرات — أعد المحاولة لاحقًا')),
+      );
     }
   }
 
