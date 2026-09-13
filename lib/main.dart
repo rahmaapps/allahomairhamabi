@@ -37,14 +37,15 @@ Future<void> main() async {
   final favoritesWereReset =
       await UserPrefs.migrateFavoritesToGlobalIdsIfNeeded();
 
-  // LOT 3.G — نettoyage global de l'ancienne tâche WorkManager « بعد الظهر »
-  // (supprimée du produit). Exécuté ici, au démarrage réel de l'app, et non
-  // plus seulement dans SettingsScreen._bootstrap() : un utilisateur qui
-  // avait ce rappel actif et qui n'ouvre plus jamais l'écran Paramètres
-  // continuait sinon à recevoir cette notification indéfiniment. Idempotent
-  // (no-op si la tâche n'existe pas) — sans risque à exécuter à chaque
-  // lancement.
-  await WorkManagerService.cancel(WorkIds.legacyAfternoon);
+  // LOT [reboot/exactAllowWhileIdle] — `workmanager` retiré du projet (plus
+  // aucun rôle : les rappels sont désormais planifiés via
+  // `NotificationService`/`zonedSchedule`, avec reprise après reboot gérée
+  // nativement par le plugin `flutter_local_notifications` — voir
+  // AndroidManifest.xml). Le nettoyage de compatibilité de l'ancienne tâche
+  // WorkManager « بعد الظهر » (LOT 3.G) devient donc sans objet : sans le
+  // plugin `workmanager`, l'app ne peut plus piloter ni annuler cette tâche
+  // native pré-existante de toute façon ; elle avait déjà été nettoyée pour
+  // les installations existantes par plusieurs lots précédents.
 
   // Premier lancement → Onboarding dédié (LOT 3.E.1), plus SettingsScreen
   // (toujours accessible ensuite depuis HOME → ⋮ → « الإعدادات », route

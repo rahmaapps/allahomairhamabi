@@ -5,6 +5,19 @@
     <!-- Android 13+ : permission de notifications (runtime) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Android 12+ : alarme exacte pour les rappels planifiés
+         (zonedSchedule / AndroidScheduleMode.exactAllowWhileIdle). Pas
+         d'auto-octroi garanti à partir d'Android 14 — géré côté Dart avec
+         repli en mode inexact si non accordée (NotificationService). Ne
+         PAS utiliser USE_EXACT_ALARM : cette app n'est pas éligible à la
+         catégorie « alarme/horloge » de la politique Play Store. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+
+    <!-- Requis par flutter_local_notifications pour reprogrammer les
+         rappels planifiés après un redémarrage du téléphone
+         (ScheduledNotificationBootReceiver ci-dessous). -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
     <application
 
         android:icon="@mipmap/ic_launcher"
@@ -35,9 +48,33 @@
             </intent-filter>
         </activity>
 
-        <!-- ⛔️ Ne PAS ajouter manuellement de <service> ici pour WorkManager/notifications.
-             Les plugins Flutter (workmanager, flutter_local_notifications, etc.)
-             injectent ce qu'il faut via manifest-merger. -->
+        <!-- Receiver natif de flutter_local_notifications : reprogramme les
+             rappels planifiés (zonedSchedule) après reboot. Doit être
+             déclaré explicitement par l'app — non injecté par le
+             manifest-merger, contrairement aux autres composants du plugin. -->
+        <receiver android:exported="false"
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Receiver natif de flutter_local_notifications : reçoit l'alarme
+             déclenchée par zonedSchedule() à l'heure programmée et affiche
+             la notification. Ciblé par PendingIntent explicite (pas
+             d'intent-filter nécessaire) — non injecté par le
+             manifest-merger, comme confirmé par l'AndroidManifest.xml
+             embarqué du plugin (aucun <receiver> déclaré côté plugin). Son
+             absence empêchait toute livraison du broadcast à l'heure
+             prévue, malgré une alarme correctement enregistrée. -->
+        <receiver android:exported="false"
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
+
+        <!-- ⛔️ Ne PAS ajouter manuellement d'autre <service> ici : les
+             plugins Flutter (flutter_local_notifications, etc.) injectent
+             le reste via manifest-merger. -->
 
     </application>
 
