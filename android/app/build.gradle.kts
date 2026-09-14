@@ -8,10 +8,22 @@ plugins {
 }
 
 // ---- Charge les secrets de signature depuis key.properties (s'il existe) ----
-val keystoreProps = Properties().apply {
-    val f = rootProject.file("key.properties")
-    if (f.exists()) {
-        load(f.inputStream())
+val keyPropertiesFile = rootProject.file("key.properties")
+val keystoreProps = Properties()
+var signingConfigError: String? = null
+
+if (!keyPropertiesFile.exists()) {
+    signingConfigError = "fichier introuvable : ${keyPropertiesFile.path}"
+} else {
+    try {
+        keyPropertiesFile.inputStream().use { keystoreProps.load(it) }
+        val requiredKeys = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
+        val missingKeys = requiredKeys.filter { keystoreProps.getProperty(it).isNullOrBlank() }
+        if (missingKeys.isNotEmpty()) {
+            signingConfigError = "propriétés manquantes ou vides : ${missingKeys.joinToString(", ")}"
+        }
+    } catch (e: Exception) {
+        signingConfigError = "fichier illisible : ${e.message}"
     }
 }
 
@@ -43,7 +55,7 @@ android {
 
     // ---- Configs de signature ----
 
-    val hasSigning = keystoreProps.getProperty("storeFile")?.isNotBlank() == true
+    val hasSigning = signingConfigError == null
 
     signingConfigs {
         if (hasSigning) {
@@ -71,6 +83,22 @@ android {
         getByName("debug") { /* rien */ }
     }
 
+}
+
+// ---- Fail-fast : un build `release` sans signature valide doit échouer
+// explicitement, plutôt que de produire silencieusement un artefact non
+// signé (ou signé par erreur avec le keystore debug). Les autres variants
+// (debug, etc.) ne sont pas affectés : ce contrôle ne se déclenche que si
+// une tâche `release` fait effectivement partie du graphe de tâches exécuté.
+gradle.taskGraph.whenReady {
+    val buildingRelease = allTasks.any { it.name.contains("Release") }
+    if (buildingRelease && signingConfigError != null) {
+        throw GradleException(
+            "Signature release invalide ou introuvable ($signingConfigError). " +
+                "Renseignez android/key.properties (storeFile, storePassword, " +
+                "keyAlias, keyPassword) avant de lancer un build release."
+        )
+    }
 }
 
 flutter {
