@@ -119,13 +119,13 @@ class NotificationService {
   /// Repli sûr sur `tz.UTC` en cas d'échec (plateforme non supportée,
   /// identifiant renvoyé inconnu de la base IANA embarquée, etc.) — ne lève
   /// jamais d'exception. Ce repli n'est plus le cas nominal : c'est
-  /// uniquement une sécurité si la détection native échoue. Aucun impact
-  /// sur `_nextInstanceOfTime`/`_nextInstanceOfWeekday`, qui continuent de
-  /// calculer l'instant absolu à partir de l'horloge locale réelle de
-  /// l'appareil (`DateTime.now()`/`.toUtc()`) quel que soit le résultat ici
-  /// — cette résolution ne fait qu'étiqueter correctement `tz.local` pour
-  /// que le plugin natif (et tout futur usage direct de `tz.local`)
-  /// reflète le vrai fuseau de l'utilisateur.
+  /// uniquement une sécurité si la détection native échoue. `tz.local` est
+  /// ensuite utilisé directement par `_nextInstanceOfTime`/
+  /// `_nextInstanceOfWeekday` pour construire le `TZDateTime` planifié —
+  /// condition nécessaire pour que le plugin natif recalcule chaque
+  /// occurrence récurrente (`matchDateTimeComponents`) dans le vrai fuseau
+  /// de l'utilisateur plutôt qu'en UTC (sans DST), et préserve ainsi
+  /// l'heure murale locale du rappel à travers les transitions DST.
   Future<void> _configureLocalTimezone() async {
     try {
       final info = await FlutterTimezone.getLocalTimezone();
@@ -273,32 +273,35 @@ class NotificationService {
   }
 
   /// Prochaine occurrence de `hour:minute` (aujourd'hui si pas encore
-  /// passée, sinon demain). La récurrence quotidienne est ensuite déléguée
-  /// nativement à `matchDateTimeComponents: DateTimeComponents.time` — pas
-  /// de recalcul manuel après le premier déclenchement (contrairement à
-  /// l'ancien mécanisme WorkManager).
+  /// passée, sinon demain). Construit dans `tz.local` (fuseau IANA réel de
+  /// l'appareil, résolu par `_configureLocalTimezone()`) — pas en `tz.UTC` —
+  /// pour que la récurrence quotidienne, déléguée nativement à
+  /// `matchDateTimeComponents: DateTimeComponents.time`, reste ancrée sur
+  /// la même heure murale locale à travers les transitions DST du fuseau
+  /// réel de l'utilisateur. Pas de recalcul manuel après le premier
+  /// déclenchement (contrairement à l'ancien mécanisme WorkManager).
   tz.TZDateTime _nextInstanceOfTime(int hour, int minute) {
-    final now = DateTime.now();
-    var scheduledLocal = DateTime(now.year, now.month, now.day, hour, minute);
-    if (!scheduledLocal.isAfter(now)) {
-      scheduledLocal = scheduledLocal.add(const Duration(days: 1));
+    final now = tz.TZDateTime.now(tz.local);
+    var scheduled = tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
+    if (!scheduled.isAfter(now)) {
+      scheduled = scheduled.add(const Duration(days: 1));
     }
-    return tz.TZDateTime.from(scheduledLocal.toUtc(), tz.UTC);
+    return scheduled;
   }
 
-  /// Même principe que [_nextInstanceOfTime], ancré sur le prochain jour de
-  /// semaine [weekday] (`DateTime.friday`, etc.) à `hour:minute`. Récurrence
-  /// hebdomadaire déléguée nativement à
+  /// Même principe que [_nextInstanceOfTime] (construit dans `tz.local`),
+  /// ancré sur le prochain jour de semaine [weekday] (`DateTime.friday`,
+  /// etc.) à `hour:minute`. Récurrence hebdomadaire déléguée nativement à
   /// `matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime`.
   tz.TZDateTime _nextInstanceOfWeekday(int weekday, int hour, int minute) {
-    final now = DateTime.now();
+    final now = tz.TZDateTime.now(tz.local);
     final daysUntil = (weekday - now.weekday) % 7;
-    var scheduledLocal =
-        DateTime(now.year, now.month, now.day, hour, minute).add(Duration(days: daysUntil));
-    if (!scheduledLocal.isAfter(now)) {
-      scheduledLocal = scheduledLocal.add(const Duration(days: 7));
+    var scheduled = tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute)
+        .add(Duration(days: daysUntil));
+    if (!scheduled.isAfter(now)) {
+      scheduled = scheduled.add(const Duration(days: 7));
     }
-    return tz.TZDateTime.from(scheduledLocal.toUtc(), tz.UTC);
+    return scheduled;
   }
 
   /// Contenu (canal/id/titre/corps) d'un rappel par période — mêmes valeurs
