@@ -8,6 +8,7 @@ import '../theme/app_shadows.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
 import '../widgets/app_bar.dart';
+import '../widgets/app_empty_state.dart';
 
 /// دعاء زيارة القبر — écran de lecture dédié (docs/ui_ux/ETAT_CONSOLIDE_UI_UX.md,
 /// §1/§4/§6.5 + arbitrages LOT 3.F). Écran plein de lecture seule : aucune
@@ -86,15 +87,21 @@ class _GraveVisitReadScreenState extends State<GraveVisitReadScreen> {
           child: FutureBuilder<Dua?>(
             future: _futureDua,
             builder: (context, snap) {
+              // Lecture locale (§P2-B) — même traitement que Recherche/
+              // DuaReadScreen : aucun indicateur de chargement.
               if (snap.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
+                return const SizedBox.shrink();
               }
               final dua = snap.data;
               if (dua == null) {
-                return const SizedBox.shrink();
+                // Jamais d'écran blanc (§P1-G) — même gabarit/message que
+                // `DuaReadScreen` pour le même cas (douʿā introuvable).
+                return const AppEmptyState(
+                  message: 'تعذّر العثور على هذا الدعاء.',
+                );
               }
               return Padding(
-                padding: const EdgeInsets.all(AppSpacing.lg),
+                padding: const EdgeInsets.all(AppSpacing.xl),
                 child: _GraveVisitCard(text: dua.text),
               );
             },

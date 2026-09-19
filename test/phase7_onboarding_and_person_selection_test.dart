@@ -94,6 +94,68 @@ void main() {
 
       expect(find.text('تراجع'), findsOneWidget);
     });
+
+    // §P1-D (LOT 66) — le prénom ne doit jamais être effacé par un
+    // décochage : le contrôleur garde son texte en mémoire, invisible tant
+    // que la ligne reste décochée (le champ disparaît du widget tree, voir
+    // le test ci-dessus), et doit réapparaître tel quel dès que la même
+    // personne est recochée, sans passer par تراجع.
+    testWidgets(
+        'recocher une personne après décochage retrouve son prénom déjà saisi',
+        (tester) async {
+      SharedPreferences.setMockInitialValues({
+        'flutter.persons_data': '{"father":"Youssef"}',
+      });
+
+      await tester.pumpWidget(
+        const MaterialApp(home: PersonSelectionScreen()),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Youssef'), findsWidgets);
+
+      // Décoche.
+      await tester.tap(find.widgetWithText(AppChip, 'أبي'));
+      await tester.pump();
+      expect(find.textContaining('Youssef'), findsNothing);
+
+      // Recoche la même personne — sans passer par تراجع.
+      await tester.tap(find.widgetWithText(AppChip, 'أبي'));
+      await tester.pump();
+
+      final fatherChip = tester.widget<AppChip>(find.widgetWithText(AppChip, 'أبي'));
+      expect(fatherChip.selected, isTrue);
+      expect(find.textContaining('Youssef'), findsWidgets);
+    });
+
+    // §P1-D — le comportement تراجع existant doit rester fonctionnel : il
+    // restaure à la fois la sélection ET le prénom précédemment saisi.
+    testWidgets('تراجع restaure la sélection et le prénom précédemment saisi',
+        (tester) async {
+      SharedPreferences.setMockInitialValues({
+        'flutter.persons_data': '{"father":"Youssef"}',
+      });
+
+      await tester.pumpWidget(
+        const MaterialApp(home: PersonSelectionScreen()),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(AppChip, 'أبي'));
+      await tester.pump();
+      // Laisse l'animation d'entrée du SnackBar se terminer avant de taper
+      // sur son action — sinon le hit test peut manquer le bouton encore en
+      // cours de transition.
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text('تراجع'), findsOneWidget);
+
+      await tester.tap(find.byType(SnackBarAction));
+      await tester.pump();
+
+      final fatherChip = tester.widget<AppChip>(find.widgetWithText(AppChip, 'أبي'));
+      expect(fatherChip.selected, isTrue);
+      expect(find.textContaining('Youssef'), findsWidgets);
+    });
   });
 
   group('Person Selection — sélection multiple persistante (LOT 1C.1)', () {

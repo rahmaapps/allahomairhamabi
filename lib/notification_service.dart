@@ -28,9 +28,8 @@ class NotificationService {
   static const String channelEvening = 'channel_evening';
   static const String channelFriday = 'channel_friday';
 
-  // IDs de notification des rappels planifiés (inchangés — voir
-  // `showPeriodReminder` — exposés ici pour permettre l'annulation depuis
-  // `SettingsScreen` sans dupliquer ces constantes).
+  // IDs de notification des rappels planifiés — exposés ici pour permettre
+  // l'annulation depuis `SettingsScreen` sans dupliquer ces constantes.
   static const int notificationIdMorning = 101;
   static const int notificationIdEvening = 103;
   static const int notificationIdFriday = 104;
@@ -304,10 +303,8 @@ class NotificationService {
     return scheduled;
   }
 
-  /// Contenu (canal/id/titre/corps) d'un rappel par période — mêmes valeurs
-  /// que [showPeriodReminder], dupliquées volontairement ici (fonction
-  /// interne dédiée aux rappels *planifiés*) plutôt que de modifier
-  /// [showPeriodReminder], laissé inchangé.
+  /// Contenu (canal/id/titre/corps) d'un rappel par période, pour les
+  /// rappels *planifiés*.
   ({String channelId, int notificationId, String title, String body}) _reminderContentFor(
     String periodId,
   ) {
@@ -316,29 +313,28 @@ class NotificationService {
         return (
           channelId: channelMorning,
           notificationId: notificationIdMorning,
-          title: '🌅 ابدأ يومك ببرّ والدك',
-          body: '🤲 ﴿وَقُل رَّبِّ ارْحَمْهُمَا كَمَا رَبَّيَانِي صَغِيرًا﴾',
+          title: '🌅 صباح الرحمة',
+          body: '🤲 لا تنسَ الدعاء لموتانا الأعزاء في بداية يومك',
         );
       case 'period_friday':
         return (
           channelId: channelFriday,
           notificationId: notificationIdFriday,
-          title: '🕌 يوم الجمعة مبارك',
-          body: '🤲 أكثر من الدعاء لوالدك في هذا اليوم المبارك',
+          title: '🕌 جمعة مباركة',
+          body: '🤲 لا تنسَ الدعاء لموتانا الأعزاء في هذا اليوم المبارك',
         );
       case 'period_evening':
       default:
         return (
           channelId: channelEvening,
           notificationId: notificationIdEvening,
-          title: '💛 اختم يومك بدعاء لوالدك',
-          body: '✨ ﴿رَبَّنَا اغْفِرْ لَنَا وَلِوَالِدَيْنَا﴾',
+          title: '🌙 مساء الدعاء',
+          body: '🤲 قبل أن ينتهي يومك، ادعُ لموتانا الأعزاء',
         );
     }
   }
 
-  /// Détails Android/iOS d'un rappel planifié — mêmes actions ("فتح"/
-  /// "تجاهل") que [showPeriodReminder].
+  /// Détails Android/iOS d'un rappel planifié — actions "فتح"/"تجاهل".
   NotificationDetails _reminderDetails(String channelId) {
     final androidDetails = AndroidNotificationDetails(
       channelId,
@@ -533,60 +529,6 @@ class NotificationService {
     final details = NotificationDetails(android: androidDetails, iOS: iosDetails);
 
     await _plugin.show(notificationId, title, body, details, payload: payload);
-  }
-
-  /// Helper : rappel par période (matin / soir / vendredi)
-  Future<void> showPeriodReminder({
-    required String periodId, // 'period_morning' | 'period_evening' | 'period_friday'
-    required int hour,
-    required int minute,
-  }) async {
-    String channelId;
-    String title;
-    String body;
-    int notiId;
-
-    switch (periodId) {
-      case 'period_morning':
-        channelId = channelMorning;
-        notiId = 101;
-        title = '🌅 ابدأ يومك ببرّ والدك';
-        body  = '🤲 ﴿وَقُل رَّبِّ ارْحَمْهُمَا كَمَا رَبَّيَانِي صَغِيرًا﴾';
-        break;
-
-      case 'period_friday':
-        channelId = channelFriday;
-        notiId = 104;
-        title = '🕌 يوم الجمعة مبارك';
-        body  = '🤲 أكثر من الدعاء لوالدك في هذا اليوم المبارك';
-        break;
-
-      case 'period_evening':
-      default:
-        channelId = channelEvening;
-        notiId = 103;
-        title = '💛 اختم يومك بدعاء لوالدك';
-        body  = '✨ ﴿رَبَّنَا اغْفِرْ لَنَا وَلِوَالِدَيْنَا﴾';
-        break;
-    }
-
-    await show(
-      channelId: channelId,
-      notificationId: notiId,
-      title: title,
-      body: body,
-      payload: periodId,
-      actions: const [
-        AndroidNotificationAction('open', 'فتح',
-          showsUserInterface: true,   // <— ramène l’app en avant-plan
-          cancelNotification: true,   // <— optionnel : ferme la notif
-        ),
-        AndroidNotificationAction('skip', 'تجاهل',
-          showsUserInterface: true,  // <— ignorer en silence
-          cancelNotification: true,
-        ),
-      ],
-    );
   }
 }
 

@@ -57,6 +57,13 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   void _onQueryChanged() {
+    // La visibilité de ✕ (`suffixIcon`, ci-dessous) dépend de
+    // `_controller.text.isEmpty` : un `setState` immédiat, hors debounce,
+    // évite qu'elle reste 250 ms en retard sur la frappe réelle (§P2-A).
+    // La recherche elle-même (`_query`/`_results`) reste debounced comme
+    // avant.
+    setState(() {});
+
     _debounce?.cancel();
     // Debounce 250 ms (§4 Recherche).
     _debounce = Timer(const Duration(milliseconds: 250), () {
@@ -116,9 +123,9 @@ class _SearchScreenState extends State<SearchScreen> {
             children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.lg,
+                  AppSpacing.xl,
                   AppSpacing.md,
-                  AppSpacing.lg,
+                  AppSpacing.xl,
                   AppSpacing.sm,
                 ),
                 child: TextField(
@@ -178,14 +185,22 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _buildResults(ColorScheme cs) {
     if (_query.isEmpty) {
-      // État initial : glyphe ⌕ + compteur, aucun historique/suggestion.
-      // Chiffres occidentaux (décision UX — remplace les chiffres
+      // État initial : glyphe ⌕ + compteur, aucun historique/suggestion
+      // (§4 ; §P2-A — le glyphe manquait, seule la ligne de texte était
+      // rendue). Chiffres occidentaux (décision UX — remplace les chiffres
       // arabes-indiens initialement prévus par §3 pour ce cas précis).
       return Center(
-        child: Text(
-          'ابحث في ${_all.length} دعاء',
-          textDirection: TextDirection.rtl,
-          style: AppTypography.body.copyWith(color: cs.onSurfaceVariant),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.search, size: 32, color: cs.onSurfaceVariant),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              'ابحث في ${_all.length} دعاء',
+              textDirection: TextDirection.rtl,
+              style: AppTypography.body.copyWith(color: cs.onSurfaceVariant),
+            ),
+          ],
         ),
       );
     }
@@ -222,7 +237,7 @@ class _SearchScreenState extends State<SearchScreen> {
     }
 
     return ListView.separated(
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      padding: const EdgeInsets.all(AppSpacing.xl),
       itemCount: _results.length,
       separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.md),
       itemBuilder: (context, index) {

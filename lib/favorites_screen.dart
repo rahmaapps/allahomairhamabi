@@ -174,8 +174,12 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
           body: FutureBuilder<List<Dua>>(
             future: _futureFavs,
             builder: (context, snap) {
+              // Lecture locale (§P2-B) — même traitement que Recherche/
+              // DuaReadScreen : aucun indicateur de chargement, un cadre
+              // vide le temps d'un frame plutôt qu'un spinner qui ne ferait
+              // que clignoter.
               if (snap.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
+                return const SizedBox.shrink();
               }
               final favs = snap.data ?? const <Dua>[];
 
@@ -186,22 +190,23 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                 );
               }
 
-              return RefreshIndicator(
-                onRefresh: _refresh,
-                child: ListView.separated(
-                  padding: const EdgeInsets.all(AppSpacing.lg),
-                  itemCount: favs.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.md),
-                  itemBuilder: (context, index) {
-                    final d = favs[index];
-                    return AppDuaResultCard(
-                      text: d.text,
-                      showFavoriteHeart: true,
-                      onFavoriteTap: () => _removeFavorite(context, d),
-                      onTap: () => _openReading(d),
-                    );
-                  },
-                ),
+              // `RefreshIndicator` retiré (§P2-B) : liste locale déjà
+              // resynchronisée au retour de la lecture (`_refresh()` après
+              // le `push`) — rien à rafraîchir par un geste de tirage, qui
+              // n'introduisait qu'un spinner Material non spécifié.
+              return ListView.separated(
+                padding: const EdgeInsets.all(AppSpacing.xl),
+                itemCount: favs.length,
+                separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.md),
+                itemBuilder: (context, index) {
+                  final d = favs[index];
+                  return AppDuaResultCard(
+                    text: d.text,
+                    showFavoriteHeart: true,
+                    onFavoriteTap: () => _removeFavorite(context, d),
+                    onTap: () => _openReading(d),
+                  );
+                },
               );
             },
           ),

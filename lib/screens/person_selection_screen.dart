@@ -107,12 +107,21 @@ class _PersonSelectionScreenState extends State<PersonSelectionScreen> {
   /// retomberait sur celui, racine, de `MaterialApp`, partagé par toute
   /// l'app — le snackbar restait alors affiché après avoir quitté l'écran,
   /// y compris après retour au HOME).
+  ///
+  /// Décocher ne vide jamais le champ (§4 : « le prénom est toujours
+  /// facultatif, conservé même après décochage » — même comportement que
+  /// l'Onboarding, `_togglePerson`) : le contrôleur garde son texte,
+  /// invisible tant que la ligne n'est pas recochée, où il réapparaît tel
+  /// quel. La persistance `persons_data` reste par construction limitée aux
+  /// personnes cochées (la présence d'une clé EST la sélection) — la
+  /// conservation porte donc sur le champ affiché, pas sur un stockage
+  /// disque distinct pour une personne décochée, que le modèle existant ne
+  /// permet pas de distinguer d'« jamais renseignée ».
   void _uncheck(BuildContext snackBarContext, PersonType person) {
     final previousName = controllers[person]!.text;
 
     setState(() {
       selectedPersons.remove(person);
-      controllers[person]!.clear();
     });
     _persist();
 
@@ -184,7 +193,7 @@ class _PersonSelectionScreenState extends State<PersonSelectionScreen> {
           // Aucun CTA en bas (§4) : le bas de l'écran reste vide.
           body: SafeArea(
             child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.lg),
+              padding: const EdgeInsets.all(AppSpacing.xl),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -226,8 +235,22 @@ class _PersonSelectionScreenState extends State<PersonSelectionScreen> {
                                   decoration: InputDecoration(
                                     isDense: true,
                                     hintText: 'الاسم (اختياري)',
+                                    // Bordures alignées sur le champ de
+                                    // recherche (§P2-D) — `enabledBorder`/
+                                    // `focusedBorder` explicites, sinon
+                                    // `border:` seul retombe sur le style
+                                    // Material par défaut pour ces deux
+                                    // états.
                                     border: OutlineInputBorder(
                                         borderRadius: AppRadii.fieldRadius),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: AppRadii.fieldRadius,
+                                      borderSide: BorderSide(color: cs.outline, width: 1.5),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: AppRadii.fieldRadius,
+                                      borderSide: BorderSide(color: cs.primary, width: 1.5),
+                                    ),
                                   ),
                                   onChanged: (v) => _onNameChanged(person, v),
                                 ),

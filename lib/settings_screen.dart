@@ -12,6 +12,7 @@ import 'theme_notifier.dart';
 import 'user_prefs.dart';
 import 'widgets/app_bar.dart';
 import 'widgets/app_card.dart';
+import 'widgets/app_snackbar.dart';
 
 /// Conservée uniquement pour compatibilité avec
 /// `test/settings_screen_lot3g_test.dart` (logique pure de replanification
@@ -38,9 +39,11 @@ class WorkManagerService {
 
 /// Paramètres — spécification consolidée (docs/ui_ux/ETAT_CONSOLIDE_UI_UX.md,
 /// §4) adaptée par les décisions verrouillées du LOT 3.G : بعد الظهر
-/// supprimé, تدعو لـ retiré de cet écran (déjà accessible ailleurs), soir et
-/// vendredi à heure fixe non configurable. Enregistrement immédiat de
-/// chaque changement — aucun bouton de sauvegarde.
+/// supprimé, تدعو لـ retiré de cet écran (déjà accessible ailleurs). Les 3
+/// rappels (صباح/مساء/جمعة) ont chacun une activation + une heure
+/// configurable et persistée séparément (évolution post-LOT 3.G : صباح,
+/// مساء et جمعة suivent désormais tous le même pattern). Enregistrement
+/// immédiat de chaque changement — aucun bouton de sauvegarde.
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -49,10 +52,6 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  /// Heures fixes, non configurables par l'utilisateur (LOT 3.G §3 et §4).
-  static const _eveningTime = TimeOfDay(hour: 20, minute: 0);
-  static const _fridayTime = TimeOfDay(hour: 9, minute: 0);
-
   /// Texte de partage validé (LOT 3.O — « مشاركة التطبيق »). Mécanisme natif
   /// uniquement (`Share.share`), aucune logique spécifique à une app tierce
   /// (remplace l'ancienne intégration WhatsApp de `home_screen.dart`,
@@ -69,7 +68,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _enableMorning = true;
   TimeOfDay _morningTime = const TimeOfDay(hour: 9, minute: 0);
   bool _enableEvening = true;
+  TimeOfDay _eveningTime = const TimeOfDay(hour: 20, minute: 0);
   bool _enableFriday = false;
+  TimeOfDay _fridayTime = const TimeOfDay(hour: 9, minute: 0);
 
   bool _loading = true;
 
@@ -94,7 +95,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final enM = await prefs.getMorningEnabled();
     final tmM = await prefs.getMorningTime();
     final enE = await prefs.getEveningEnabled();
+    final tmE = await prefs.getEveningTime();
     final enF = await prefs.getFridayEnabled();
+    final tmF = await prefs.getFridayTime();
 
     if (!mounted) return;
     setState(() {
@@ -102,17 +105,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _enableMorning = enM;
       _morningTime = tmM;
       _enableEvening = enE;
+      _eveningTime = tmE;
       _enableFriday = enF;
+      _fridayTime = tmF;
       _loading = false;
     });
 
     await _syncBackgroundSchedules();
   }
 
-  Future<void> _pickMorningTime() async {
-    final res = await showTimePicker(
+  Future<TimeOfDay?> _showRtlTimePicker(TimeOfDay initialTime) {
+    return showTimePicker(
       context: context,
-      initialTime: _morningTime,
+      initialTime: initialTime,
       builder: (context, child) {
         return Directionality(
           textDirection: TextDirection.rtl,
@@ -120,9 +125,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
         );
       },
     );
+  }
+
+  Future<void> _pickMorningTime() async {
+    final res = await _showRtlTimePicker(_morningTime);
     if (res == null) return;
     setState(() => _morningTime = res);
     await UserPrefs().setMorningTime(res);
+    await _syncBackgroundSchedules();
+  }
+
+  Future<void> _pickEveningTime() async {
+    final res = await _showRtlTimePicker(_eveningTime);
+    if (res == null) return;
+    setState(() => _eveningTime = res);
+    await UserPrefs().setEveningTime(res);
+    await _syncBackgroundSchedules();
+  }
+
+  Future<void> _pickFridayTime() async {
+    final res = await _showRtlTimePicker(_fridayTime);
+    if (res == null) return;
+    setState(() => _fridayTime = res);
+    await UserPrefs().setFridayTime(res);
     await _syncBackgroundSchedules();
   }
 
@@ -228,9 +253,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     if (scheduleFailed && mounted) {
       setState(() {}); // reflète l'état corrigé (rappel repassé à désactivé)
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تعذّرت برمجة أحد التذكيرات — أعد المحاولة لاحقًا')),
-      );
+      showAppToast(context, 'تعذّرت برمجة أحد التذكيرات — أعد المحاولة لاحقًا');
     }
   }
 
@@ -250,15 +273,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
       if (!ok && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تعذّر فتح صفحة حول التطبيق')),
-        );
+        showAppToast(context, 'تعذّر فتح صفحة حول التطبيق');
       }
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تعذّر فتح صفحة حول التطبيق')),
-      );
+      showAppToast(context, 'تعذّر فتح صفحة حول التطبيق');
     }
   }
 
@@ -278,11 +297,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           height: 52,
           titleStyle: AppTypography.sectionTitle.copyWith(color: appBarForeground),
         ),
+        // Lecture locale (§P2-B) — même traitement que Recherche/
+        // DuaReadScreen/Favoris/Visite : aucun indicateur de chargement.
         body: _loading
-            ? const Center(child: CircularProgressIndicator())
+            ? const SizedBox.shrink()
             : SafeArea(
                 child: ListView(
-                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  padding: const EdgeInsets.all(AppSpacing.xl),
                   children: [
                     const _SectionTitle('التذكير'),
                     const SizedBox(height: AppSpacing.sm),
@@ -290,23 +311,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       level: AppCardLevel.settingsGroup,
                       child: Column(
                         children: [
-                          _MorningReminderRows(
+                          _ReminderRow(
+                            label: 'تذكير الصباح',
                             enabled: _enableMorning,
                             time: _morningTime,
                             onToggle: _setMorningEnabled,
                             onPickTime: _pickMorningTime,
                           ),
                           const _RowDivider(),
-                          _SettingsSwitchRow(
+                          _ReminderRow(
                             label: 'تذكير المساء',
-                            value: _enableEvening,
-                            onChanged: _setEveningEnabled,
+                            enabled: _enableEvening,
+                            time: _eveningTime,
+                            onToggle: _setEveningEnabled,
+                            onPickTime: _pickEveningTime,
                           ),
                           const _RowDivider(),
-                          _SettingsSwitchRow(
+                          _ReminderRow(
                             label: 'تذكير الجمعة',
-                            value: _enableFriday,
-                            onChanged: _setFridayEnabled,
+                            enabled: _enableFriday,
+                            time: _fridayTime,
+                            onToggle: _setFridayEnabled,
+                            onPickTime: _pickFridayTime,
                           ),
                         ],
                       ),
@@ -367,17 +393,20 @@ class _RowDivider extends StatelessWidget {
   }
 }
 
-/// تذكير الصباح + الوقت — reprend strictement le pattern déjà validé de
-/// `OnboardingScreen._buildReminderStep` (Switch puis ligne d'heure qui
-/// disparaît, jamais grisée, si désactivé).
-class _MorningReminderRows extends StatelessWidget {
-  const _MorningReminderRows({
+/// Rappel (صباح/مساء/جمعة) + الوقت — reprend strictement le pattern déjà
+/// validé de `OnboardingScreen._buildReminderStep` (Switch puis ligne
+/// d'heure qui disparaît, jamais grisée, si désactivé). Les 3 rappels
+/// partagent ce même composant : chacun a sa propre heure configurable.
+class _ReminderRow extends StatelessWidget {
+  const _ReminderRow({
+    required this.label,
     required this.enabled,
     required this.time,
     required this.onToggle,
     required this.onPickTime,
   });
 
+  final String label;
   final bool enabled;
   final TimeOfDay time;
   final ValueChanged<bool> onToggle;
@@ -394,22 +423,39 @@ class _MorningReminderRows extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            textDirection: TextDirection.rtl,
-            children: [
-              Expanded(
-                child: Text(
-                  'تذكير الصباح',
-                  textDirection: TextDirection.rtl,
-                  style: AppTypography.body.copyWith(color: cs.onSurface),
-                ),
+          // Toute la ligne est cliquable (§P1-J), pas seulement l'interrupteur
+          // — même comportement d'activation/désactivation qu'avant
+          // (`onToggle(!enabled)` reproduit exactement ce que `Switch.onChanged`
+          // recevait déjà pour un tap simple). `IgnorePointer` sur le `Switch`
+          // évite un double-basculement : un seul gestionnaire de tap (cet
+          // `InkWell`) gouverne toute la zone, y compris visuellement
+          // au-dessus de l'interrupteur.
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => onToggle(!enabled),
+              splashFactory: NoSplash.splashFactory,
+              highlightColor: Colors.transparent,
+              child: Row(
+                textDirection: TextDirection.rtl,
+                children: [
+                  Expanded(
+                    child: Text(
+                      label,
+                      textDirection: TextDirection.rtl,
+                      style: AppTypography.body.copyWith(color: cs.onSurface),
+                    ),
+                  ),
+                  IgnorePointer(
+                    child: Switch(
+                      value: enabled,
+                      activeThumbColor: cs.primary,
+                      onChanged: onToggle,
+                    ),
+                  ),
+                ],
               ),
-              Switch(
-                value: enabled,
-                activeThumbColor: cs.primary,
-                onChanged: onToggle,
-              ),
-            ],
+            ),
           ),
           // La ligne « الوقت » disparaît complètement si désactivé — jamais
           // grisée (§4).
@@ -437,44 +483,6 @@ class _MorningReminderRows extends StatelessWidget {
               ],
             ),
           ],
-        ],
-      ),
-    );
-  }
-}
-
-/// Ligne de réglage à switch seul, sans heure — تذكير المساء / تذكير الجمعة
-/// (LOT 3.G : heure fixe non configurable, aucune ligne supplémentaire).
-class _SettingsSwitchRow extends StatelessWidget {
-  const _SettingsSwitchRow({
-    required this.label,
-    required this.value,
-    required this.onChanged,
-  });
-
-  final String label;
-  final bool value;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.xl,
-        vertical: AppSpacing.md,
-      ),
-      child: Row(
-        textDirection: TextDirection.rtl,
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              textDirection: TextDirection.rtl,
-              style: AppTypography.body.copyWith(color: cs.onSurface),
-            ),
-          ),
-          Switch(value: value, activeThumbColor: cs.primary, onChanged: onChanged),
         ],
       ),
     );

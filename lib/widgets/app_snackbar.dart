@@ -32,9 +32,12 @@ void showAppUndoSnackBar(
       behavior: SnackBarBehavior.floating,
       duration: const Duration(seconds: 6),
       shape: RoundedRectangleBorder(borderRadius: AppRadii.buttonRadius),
-      margin: const EdgeInsets.only(
-        left: AppSpacing.lg,
-        right: AppSpacing.lg,
+      // `EdgeInsetsDirectional` (§P2-G), pas `EdgeInsets.only(left:/right:)`
+      // — règle RTL sans exception, même si les deux valeurs sont
+      // symétriques ici (aucun changement visuel).
+      margin: const EdgeInsetsDirectional.only(
+        start: AppSpacing.lg,
+        end: AppSpacing.lg,
         bottom: AppSpacing.lg,
       ),
       content: Text(

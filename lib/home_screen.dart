@@ -7,7 +7,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // Clipboard + Haptics
 import 'package:flutter/rendering.dart'; // RenderRepaintBoundary
 import 'package:share_plus/share_plus.dart';
-import 'package:in_app_review/in_app_review.dart';
 
 import 'dua_repository.dart';
 import 'models/dua.dart';
@@ -45,6 +44,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   int? _currentId;
   bool _isFavorite = false;
 
+  // État vide/erreur (§P1-G) — jamais affiché dans la carte sacrée (§3 :
+  // gabarit `AppEmptyState`, « hors de la carte sacrée »). `null` : la
+  // carte affiche `_currentDuaText` normalement ; non-null : la carte N1
+  // (filet d'or + rosace) n'est pas rendue, `AppEmptyState` la remplace
+  // avec ce message.
+  String? _emptyStateMessage;
+
   //Suffixe des textes copiés ou partagés
   static const String _ATTR_SUFFIX_AR =
       '\n\n— من تطبيق اللَّهُمَّ ارْحَمْ أَبِي —';
@@ -60,10 +66,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   int _deckCursor = 0;
 
   // ===== Animations =====
-  late final AnimationController _anim;
-  late final Animation<double> _fade;
-  late final Animation<Offset> _slide;
+  // C1 « دعاء آخر » (renouvellement de contenu) : 280 ms, easeOutCubic,
+  // déplacement vertical 10 dp uniquement, entrée par le bas. La carte/le
+  // support ne bougent jamais — seul le contenu texte est translaté, jamais
+  // fondu (le texte sacré reste peint à l'opacité 1 dès la frame 0).
+  late final AnimationController _duaAnimCtrl;
+  late final Animation<double> _duaSlide;
+
+  // B2 changement de catégorie (changement de contexte) : glissement
+  // horizontal RTL 16 dp, 240 ms, easeInOutCubic. Contrôleur distinct de
+  // C1 — les deux mouvements ne portent jamais la même sémantique.
+  late final AnimationController _categoryAnimCtrl;
+  late final Animation<double> _categorySlide;
+
   late final AnimationController _heartCtrl;
+  late final Animation<double> _heartScale;
 
   // ===== Export Premium (carte-image partageable du dou'a affiché) =====
   // Une seule clé : décision produit V1.2 — toujours EXACTEMENT une image
@@ -90,20 +107,31 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void initState() {
     super.initState();
 
+    // Aligné à l'identique sur le ♥ déjà conforme de DuaReadScreen (§P1-H) :
+    // 1 → 1.12 → 1 en 200 ms, easeOut, jamais animé au retrait.
     _heartCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 250),
-      lowerBound: 0.7,
-      upperBound: 1.2,
+      duration: const Duration(milliseconds: 200),
+    );
+    _heartScale = Tween<double>(begin: 1, end: 1.12).animate(
+      CurvedAnimation(parent: _heartCtrl, curve: Curves.easeOut),
     );
 
-    _anim = AnimationController(
+    _duaAnimCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 450),
+      duration: const Duration(milliseconds: 280),
     );
-    _fade = CurvedAnimation(parent: _anim, curve: Curves.easeInOut);
-    _slide = Tween<Offset>(begin: const Offset(0, 0.15), end: Offset.zero)
-        .animate(CurvedAnimation(parent: _anim, curve: Curves.easeOut));
+    _duaSlide = Tween<double>(begin: 10, end: 0).animate(
+      CurvedAnimation(parent: _duaAnimCtrl, curve: Curves.easeOutCubic),
+    );
+
+    _categoryAnimCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 240),
+    );
+    _categorySlide = Tween<double>(begin: 16, end: 0).animate(
+      CurvedAnimation(parent: _categoryAnimCtrl, curve: Curves.easeInOutCubic),
+    );
 
     _loadInitial();
     _loadSelectedTemplate();
@@ -111,7 +139,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   @override
   void dispose() {
-    _anim.dispose();
+    _duaAnimCtrl.dispose();
+    _categoryAnimCtrl.dispose();
     _heartCtrl.dispose();
     super.dispose();
   }
@@ -119,22 +148,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // ===========================================================================
   // CHARGEMENT INITIAL
   // ===========================================================================
-
-  // Mécanisme d'évaluation prévu au MVP — conservé pour une intégration
-  // dédiée ultérieure (non supprimé, décision produit antérieure à ce lot).
-  Future<void> _rateApp() async {
-    final InAppReview inAppReview = InAppReview.instance;
-    if (await inAppReview.isAvailable()) {
-      // Ouvre la popup native d'évaluation
-      await inAppReview.requestReview();
-      return;
-    } else {
-      // Ouvre la page Play Store (après publication officielle)
-      await inAppReview.openStoreListing(
-        appStoreId: null, // pas utilisé sur Android
-      );
-    }
-  }
 
   // Source de vérité unique pour appliquer le prénom personnalisé au texte
   // d'un dou'a (V1.2). CONTRAIREMENT à l'ancienne version, la personne n'est
@@ -169,10 +182,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     if (d != null) {
       _currentId = d.id;
       _currentDuaText = _personalizeDuaText(d.text, d.personKey);
+      _emptyStateMessage = null;
 
       _isFavorite = await UserPrefs.instance.isFavorite(_currentId!);
       if (mounted) setState(() {});
-      _anim.forward(from: 0);
+      _duaAnimCtrl.forward(from: 0);
     }
 
     // Préparer le deck filtré (en évitant de répéter le dou‘a courant)
@@ -204,7 +218,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   // ===========================================================================
   // TIRAGE ALÉATOIRE (respecte la cat ; fallback “all”)
-  Future<void> _loadRandomDua({bool ignoreCategory = false}) async {
+  Future<void> _loadRandomDua({
+    bool ignoreCategory = false,
+    bool isCategoryChange = false,
+  }) async {
     await _refreshLengthFilter();
 
     try {
@@ -226,9 +243,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ? list
           : data[randomKey]?['normal'] ?? [];
 
-    // sécurité
+    // sécurité — état vide (§P1-G) : jamais dans la carte sacrée,
+      // `AppEmptyState` la remplace (voir build()). `_currentDuaText` n'est
+      // plus écrasé : نسخ/مشاركة, s'ils restent visibles, continuent de
+      // porter le dernier douʿā réel affiché plutôt qu'un message d'erreur.
       if (finalList.isEmpty) {
-        _currentDuaText = "لا يوجد دعاء حالياً";
+        _emptyStateMessage = "لا يوجد دعاء حالياً";
         if (mounted) setState(() {});
         return;
       }
@@ -244,14 +264,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       // ✅ id réel du dou'a (V1.2) — jamais un timestamp : un favori créé
       // à partir de ce repli doit pointer vers une entrée existante du JSON.
       _currentId = random['id'] as int;
+      _emptyStateMessage = null;
 
       if (mounted) setState(() {});
-      _anim.forward(from: 0);
+      if (isCategoryChange) {
+        _categoryAnimCtrl.forward(from: 0);
+      } else {
+        _duaAnimCtrl.forward(from: 0);
+      }
 
     } catch (e) {
       debugPrint("❌ ERREUR: $e");
 
-      _currentDuaText = "حدث خطأ أثناء تحميل الدعاء";
+      // État d'erreur (§P1-G) — jamais dans la carte sacrée, voir plus haut.
+      _emptyStateMessage = "حدث خطأ أثناء تحميل الدعاء";
       if (mounted) setState(() {});
     }
   }
@@ -274,10 +300,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     await _rebuildDeckFiltered(excludeId: _currentId);
 
     if (_deckIds.isNotEmpty) {
-      await _showNextFromDeck();
+      await _showNextFromDeck(isCategoryChange: true);
     } else {
       // fallback si la cat ne renvoie rien (on ignore la catégorie)
-      await _loadRandomDua(ignoreCategory: true);
+      await _loadRandomDua(ignoreCategory: true, isCategoryChange: true);
     }
   }
 
@@ -387,7 +413,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       context: context,
       useSafeArea: true,
       showDragHandle: true,
-      backgroundColor: cs.surface,
+      // Fond `bg` (§P2-C), pas `surface` — §3 spécifie `bg` pour les bottom
+      // sheets ; `bg` == `ThemeData.scaffoldBackgroundColor` (voir
+      // `theme/app_theme.dart`), déjà le mécanisme centralisé existant.
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadii.hero)),
       ),
@@ -564,13 +593,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // aucune multi-sélection, aucun badge `الحالي`, aucune snackbar — un tap
   // ferme la feuille et ouvre directement l'écran de lecture.
   void _openGraveVisitPersonPicker() {
-    final cs = Theme.of(context).colorScheme;
-
     showModalBottomSheet(
       context: context,
       useSafeArea: true,
       showDragHandle: true,
-      backgroundColor: cs.surface,
+      // Fond `bg` (§P2-C) — voir même correctif dans `_openTemplatePicker`.
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadii.hero)),
       ),
@@ -621,6 +649,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             AppSpacing.xxl + MediaQuery.viewPaddingOf(sheetContext).bottom,
           ),
           child: Wrap(
+            textDirection: TextDirection.rtl,
             spacing: AppSpacing.sm,
             runSpacing: AppSpacing.sm,
             alignment: WrapAlignment.center,
@@ -678,7 +707,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         '[DECK] cat=$_activeCategory len=$_lengthFilter persons=${personsData.keys.toList()} -> ids=${_deckIds.length}');
   }
 
-  Future<void> _showNextFromDeck() async {
+  Future<void> _showNextFromDeck({bool isCategoryChange = false}) async {
 
     if (personsData.isEmpty) {
       debugPrint("⚠️ force rebuild (no persons)");
@@ -694,7 +723,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     // encore vide ? fallback
     if (_deckIds.isEmpty) {
-      await _loadRandomDua(ignoreCategory: true);
+      await _loadRandomDua(ignoreCategory: true, isCategoryChange: isCategoryChange);
       return;
     }
 
@@ -706,17 +735,22 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final d = await _repo.getById(id);
     if (d == null) {
       debugPrint("⚠️ Aucun douaa trouvé !");
-      await _loadRandomDua(ignoreCategory: true);
+      await _loadRandomDua(ignoreCategory: true, isCategoryChange: isCategoryChange);
       return;
     }
 
     _currentId = d.id;
     _currentDuaText = _personalizeDuaText(d.text, d.personKey);
+    _emptyStateMessage = null;
 
     _isFavorite = await UserPrefs.instance.isFavorite(_currentId!);
 
     if (mounted) setState(() {});
-    _anim.forward(from: 0);
+    if (isCategoryChange) {
+      _categoryAnimCtrl.forward(from: 0);
+    } else {
+      _duaAnimCtrl.forward(from: 0);
+    }
   }
 
   // ===========================================================================
@@ -896,34 +930,43 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+  /// ♥ HOME — aligné à l'identique sur le ♥ déjà conforme de
+  /// `DuaReadScreen` (§P1-H) : icône 24, cible tactile 48×48, animation
+  /// `1 → 1.12 → 1` en 200 ms **uniquement à l'ajout** (asymétrie
+  /// volontaire, jamais au retrait). `UserPrefs` reste l'unique source de
+  /// vérité, aucun état local indépendant.
   Widget _buildFavoriteButton(ColorScheme cs, bool isDark) {
+    final heartInactiveColor =
+        isDark ? AppColorsDark.textSecondary : AppColorsLight.textSecondary;
+
     return ScaleTransition(
-      scale: _heartCtrl,
-      child: InkWell(
-        borderRadius: AppRadii.pillRadius,
-        onTap: () async {
-          if (_currentId == null) return;
-          HapticFeedback.selectionClick();
-          _heartCtrl.forward().then((_) => _heartCtrl.reverse());
+      scale: _heartScale,
+      child: SizedBox(
+        width: 48,
+        height: 48,
+        child: IconButton(
+          padding: EdgeInsets.zero,
+          onPressed: () async {
+            if (_currentId == null) return;
+            HapticFeedback.selectionClick();
 
-          await UserPrefs.instance.toggleFavorite(_currentId!);
-          if (_isFavorite) {
-            await UserPrefs.saveFavoriteText(_currentId!, _currentDuaText);
-          }
+            final wasFavorite = _isFavorite;
+            await UserPrefs.instance.toggleFavorite(_currentId!);
+            final isFav = await UserPrefs.instance.isFavorite(_currentId!);
 
-          _isFavorite = await UserPrefs.instance.isFavorite(_currentId!);
-          if (mounted) setState(() {});
-        },
-        child: Container(
-          padding: const EdgeInsets.all(AppSpacing.sm),
-          decoration: BoxDecoration(
-            color: cs.surface.withValues(alpha: isDark ? 0.85 : 0.92),
-            borderRadius: AppRadii.pillRadius,
-          ),
-          child: Icon(
+            // Sauvegarde du texte personnalisé à l'AJOUT uniquement (§P0-A) :
+            // état relu APRÈS le toggle, jamais l'ancienne valeur.
+            if (!wasFavorite && isFav) {
+              await UserPrefs.saveFavoriteText(_currentId!, _currentDuaText);
+              _heartCtrl.forward(from: 0).then((_) => _heartCtrl.reverse());
+            }
+
+            if (mounted) setState(() => _isFavorite = isFav);
+          },
+          icon: Icon(
             _isFavorite ? Icons.favorite : Icons.favorite_border,
-            color: _isFavorite ? cs.error : cs.onSurface.withValues(alpha: 0.7),
-            size: 26,
+            size: 24,
+            color: _isFavorite ? cs.error : heartInactiveColor,
           ),
         ),
       ),
@@ -1034,6 +1077,66 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+  /// Contenu normal de la carte N1 (extrait tel quel de `build()`, §P1-G) —
+  /// rendu uniquement quand un douʿā réel est affiché (`_emptyStateMessage
+  /// == null`) ; en état vide/erreur, `AppEmptyState` prend sa place dans
+  /// `duaCard` sans jamais instancier `AppCard`.
+  Widget _buildDuaCardContent(ColorScheme cs, bool isDark, bool isLandscape) {
+    return AppCard(
+      child: Stack(
+        children: [
+          // Zone de texte contrainte pour exclure structurellement la
+          // bande du pied de carte (♡ + « دعاء آخر ») : à largeur/
+          // hauteur réduites, un douʿā long ne peut plus passer
+          // derrière le bouton, quelle que soit sa longueur — plutôt
+          // qu'un simple chevauchement laissé au hasard du Center.
+          Positioned.fill(
+            bottom: _cardFooterReservedHeight,
+            child: Center(
+              // C1 (دعاء آخر) : translation verticale 10 dp, entrée par
+              // le bas, 280 ms, easeOutCubic. B2 (changement de
+              // catégorie) : translation horizontale RTL 16 dp, 240 ms,
+              // easeInOutCubic. Contrôleurs distincts, jamais actifs
+              // simultanément côté produit ; combinés ici sans risque.
+              child: AnimatedBuilder(
+                animation: Listenable.merge([_duaAnimCtrl, _categoryAnimCtrl]),
+                builder: (context, child) {
+                  return Transform.translate(
+                    offset: Offset(_categorySlide.value, _duaSlide.value),
+                    child: child,
+                  );
+                },
+                child: _fadingDuaScroll(cs, isLandscape),
+              ),
+            ),
+          ),
+
+          // Pied de carte : ♡ + « دعاء آخر » — RTL naturel (aucun
+          // TextDirection.ltr forcé). Immobile : seul le contenu de la
+          // carte est animé (§B2), jamais le pied.
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Row(
+              textDirection: TextDirection.rtl,
+              children: [
+                _buildFavoriteButton(cs, isDark),
+                const Spacer(),
+                AppButton(
+                  role: AppButtonRole.secondary,
+                  icon: Icons.skip_next_rounded,
+                  label: 'دعاء آخر',
+                  onPressed: _showNextFromDeck,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ===========================================================================
   // BUILD
   // ===========================================================================
@@ -1079,50 +1182,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     // fois puis placée soit dans la Column portrait, soit dans la Column
     // principale du Row paysage.
     final duaCard = Expanded(
-      child: SlideTransition(
-        position: _slide,
-        child: FadeTransition(
-          opacity: _fade,
-          child: AppCard(
-            child: Stack(
-              children: [
-                // Zone de texte contrainte pour exclure structurellement la
-                // bande du pied de carte (♡ + « دعاء آخر ») : à largeur/
-                // hauteur réduites, un douʿā long ne peut plus passer
-                // derrière le bouton, quelle que soit sa longueur — plutôt
-                // qu'un simple chevauchement laissé au hasard du Center.
-                Positioned.fill(
-                  bottom: _cardFooterReservedHeight,
-                  child: Center(
-                    child: _fadingDuaScroll(cs, isLandscape),
-                  ),
-                ),
-
-                // Pied de carte : ♡ + « دعاء آخر » — RTL naturel (aucun
-                // TextDirection.ltr forcé).
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  child: Row(
-                    textDirection: TextDirection.rtl,
-                    children: [
-                      _buildFavoriteButton(cs, isDark),
-                      const Spacer(),
-                      AppButton(
-                        role: AppButtonRole.secondary,
-                        icon: Icons.skip_next_rounded,
-                        label: 'دعاء آخر',
-                        onPressed: _showNextFromDeck,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+      // État vide/erreur (§P1-G) — jamais habillé en contenu sacré : rendu
+      // hors de la carte N1 (pas de filet d'or, pas de rosace) via le
+      // gabarit générique `AppEmptyState`, à la place de `AppCard` — pas
+      // seulement de son texte.
+      child: _emptyStateMessage != null
+          ? AppEmptyState(message: _emptyStateMessage!)
+          : _buildDuaCardContent(cs, isDark, isLandscape),
     );
 
     // ---- نسخ / مشاركة — inchangés (hauteur 48, bascule horizontale/

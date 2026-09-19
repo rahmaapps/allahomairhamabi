@@ -28,7 +28,6 @@ class UserPrefs {
   // Switchs (nous conservons les clés existantes de ton fichier)
   static const _kEnableMorning = 'enableMorning';
   static const _kEnableEvening = 'enableEvening';
-  // LOT 3.G — تذكير الجمعة : switch seul, heure fixe non persistée (09:00).
   static const _kEnableFriday = 'enableFriday';
 
   static Future<void> saveFavoriteText(int id, String text) async {
@@ -41,11 +40,16 @@ class UserPrefs {
     return prefs.getString('fav_text_$id');
   }
 
-  // Heures/Horaires — LOT 3.G : seule تذكير الصباح garde une heure
-  // configurable et persistée (المساء et الجمعة sont fixes en dur, non
-  // persistées : 20:00 et 09:00, voir settings_screen.dart).
+  // Heures/Horaires — les 3 rappels (صباح/مساء/جمعة) ont chacun une heure
+  // configurable et persistée séparément. Défauts alignés sur les anciennes
+  // heures fixes (9:00 / 20:00 / 9:00) pour préserver le comportement des
+  // utilisateurs existants n'ayant jamais rien persisté pour مساء/جمعة.
   static const _kMorningHour = 'morningHour';
   static const _kMorningMinute = 'morningMinute';
+  static const _kEveningHour = 'eveningHour';
+  static const _kEveningMinute = 'eveningMinute';
+  static const _kFridayHour = 'fridayHour';
+  static const _kFridayMinute = 'fridayMinute';
 
   // Filtre longueur
   static const _kLengthFilter = 'length_filter'; // (déjà utilisée)
@@ -112,6 +116,32 @@ class UserPrefs {
     final sp = await _prefs();
     final h = sp.getInt(_kMorningHour) ?? 9;
     final m = sp.getInt(_kMorningMinute) ?? 0;
+    return TimeOfDay(hour: h, minute: m);
+  }
+
+  Future<void> setEveningTime(TimeOfDay t) async {
+    final sp = await _prefs();
+    await sp.setInt(_kEveningHour, t.hour);
+    await sp.setInt(_kEveningMinute, t.minute);
+  }
+
+  Future<TimeOfDay> getEveningTime() async {
+    final sp = await _prefs();
+    final h = sp.getInt(_kEveningHour) ?? 20;
+    final m = sp.getInt(_kEveningMinute) ?? 0;
+    return TimeOfDay(hour: h, minute: m);
+  }
+
+  Future<void> setFridayTime(TimeOfDay t) async {
+    final sp = await _prefs();
+    await sp.setInt(_kFridayHour, t.hour);
+    await sp.setInt(_kFridayMinute, t.minute);
+  }
+
+  Future<TimeOfDay> getFridayTime() async {
+    final sp = await _prefs();
+    final h = sp.getInt(_kFridayHour) ?? 9;
+    final m = sp.getInt(_kFridayMinute) ?? 0;
     return TimeOfDay(hour: h, minute: m);
   }
 

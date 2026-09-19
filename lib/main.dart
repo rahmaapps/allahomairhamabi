@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -9,6 +10,7 @@ import 'notification_service.dart';
 import 'theme/app_theme.dart';
 import 'theme_notifier.dart';
 import 'user_prefs.dart';
+import 'widgets/app_snackbar.dart';
 
 // Clé de navigation globale (pour naviguer depuis les callbacks)
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -59,16 +61,22 @@ Future<void> main() async {
 
     switch (actionId) {
       case 'open':
-        navigatorKey.currentState?.pushNamed('/home');
+        // §P2-E : purge la pile plutôt que d'empiler un nouveau HOME à
+        // chaque notification ouverte (l'ancien `pushNamed` répété laissait
+        // le retour arrière remonter vers un HOME précédent).
+        navigatorKey.currentState
+            ?.pushNamedAndRemoveUntil('/home', (route) => false);
         break;
 
       case 'skip':
-      // 👉 Retour visuel clair côté UI
-        _showGlobalSnack('تم تجاهل التذكير — نسأل الله أن يرحم والدك.');
+      // 👉 Retour visuel clair côté UI (§P1-F : toast DS, plus de SnackBar
+      // Material brut) — même message.
+        _showToastFromRoot('تم تجاهل التذكير — نسأل الله أن يرحم والدك.');
         break;
 
       default: // Tap sur le corps de la notif
-        navigatorKey.currentState?.pushNamed('/home');
+        navigatorKey.currentState
+            ?.pushNamedAndRemoveUntil('/home', (route) => false);
     }
   };
 
@@ -112,6 +120,20 @@ class MyApp extends StatelessWidget {
       navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
 
+      // Localisation arabe (§P1-B) — app mono-langue arabe RTL de bout en
+      // bout : `locale` fixé à `ar`, jamais dérivé de l'appareil, pour que
+      // les surfaces Material non écrites à la main (au premier chef
+      // `showTimePicker`, seul point de configuration des rappels) soient
+      // toujours en arabe, quelle que soit la langue système. N'affecte
+      // aucun texte métier — tous déjà écrits en dur en arabe.
+      locale: const Locale('ar'),
+      supportedLocales: const [Locale('ar')],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+
       // ⬇️ Active clairement les thèmes clair/sombre
       themeMode: theme.themeMode,
       theme: AppTheme.light,
@@ -137,6 +159,19 @@ void _showGlobalSnack(String text) {
   }
 }
 
+/// Toast DS (§P1-F) depuis la racine, pour les retours courts d'action de
+/// notification — remplace `_showGlobalSnack` (SnackBar Material brut)
+/// uniquement pour ces cas ; `_showGlobalSnack` reste utilisé tel quel pour
+/// le message de migration des favoris, plus long qu'une ligne (le toast DS
+/// est prévu pour `maxLines: 1`, le tronquer ferait perdre une information
+/// importante à l'utilisateur).
+void _showToastFromRoot(String text) {
+  final ctx = navigatorKey.currentContext;
+  if (ctx != null) {
+    showAppToast(ctx, text);
+  }
+}
+
 /// Lit l'action/payload posés par le handler background et navigue en conséquence
 Future<void> _consumePendingNotificationAction() async {
   final prefs = await SharedPreferences.getInstance();
@@ -152,13 +187,16 @@ Future<void> _consumePendingNotificationAction() async {
     // Router comme en foreground
     switch (action) {
       case 'open':
-        navigatorKey.currentState?.pushNamed('/home');
+        // §P2-E : même purge de pile que le handler foreground ci-dessus.
+        navigatorKey.currentState
+            ?.pushNamedAndRemoveUntil('/home', (route) => false);
         break;
       case 'skip':
-        _showGlobalSnack('نسأل الله أن يرحم والدك… سنذكّرك لاحقًا إن شاء الله.');
+        _showToastFromRoot('نسأل الله أن يرحم والدك… سنذكّرك لاحقًا إن شاء الله.');
         break;
       default:
-        navigatorKey.currentState?.pushNamed('/home');
+        navigatorKey.currentState
+            ?.pushNamedAndRemoveUntil('/home', (route) => false);
     }
   }
 }

@@ -89,11 +89,17 @@ void main() {
     return positionedFill.bottom!;
   }
 
+  // Le contenu texte est désormais enveloppé dans un `AnimatedBuilder`
+  // (translation C1/B2, §LOT 66) entre `Center` et `SingleChildScrollView` —
+  // localisé par type plutôt que par cast direct du premier enfant, pour
+  // rester robuste à ce wrapper d'animation.
   Text duaText(WidgetTester tester) {
-    final stack = findAppCard(tester).child as Stack;
-    final positionedFill = stack.children[0] as Positioned;
-    final center = positionedFill.child as Center;
-    final scrollView = center.child as SingleChildScrollView;
+    final scrollView = tester.widget<SingleChildScrollView>(
+      find.descendant(
+        of: find.byType(AppCard),
+        matching: find.byType(SingleChildScrollView),
+      ),
+    );
     return scrollView.child as Text;
   }
 
