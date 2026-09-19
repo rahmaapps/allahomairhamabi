@@ -25,10 +25,24 @@ import 'monetization_bootstrap.dart';
 /// modifié par ce lot) : une exception de plateforme doit donc être
 /// absorbée ici, jamais remontée à l'écran Paramètres.
 class PrivacyOptionsEntry {
-  PrivacyOptionsEntry({ConsentService? consentService})
-      : _consentService = consentService ?? MonetizationBootstrap.consentService;
+  PrivacyOptionsEntry({
+    ConsentService? consentService,
+    Future<void> Function()? onConsentSettled,
+  })  : _consentService = consentService ?? MonetizationBootstrap.consentService,
+        _onConsentSettled =
+            onConsentSettled ?? _defaultOnConsentSettled;
+
+  static Future<void> _defaultOnConsentSettled() async {
+    await MonetizationBootstrap.ensureAdsInitializedIfAllowed();
+  }
 
   final ConsentService _consentService;
+
+  /// Appelé après la fermeture du formulaire (LOT 5.F, correction A2) : le
+  /// consentement a pu changer, le SDK doit donc pouvoir être initialisé
+  /// dans la même session, sans redémarrage. Ne déclenche aucune publicité
+  /// et ne bloque jamais l'écran.
+  final Future<void> Function() _onConsentSettled;
 
   /// Garde contre les appels concurrents : deux activations rapprochées de
   /// la ligne ne doivent jamais ouvrir deux formulaires UMP.
@@ -70,6 +84,17 @@ class PrivacyOptionsEntry {
     _opening = true;
     try {
       await _consentService.showPrivacyOptionsForm();
+
+      // A2 : le consentement a pu être accordé à l'instant. Ne peut pas
+      // faire échouer l'ouverture du formulaire, qui a bien eu lieu.
+      try {
+        await _onConsentSettled();
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('[Monetization] Activation Ads post-consentement ignorée: $e');
+        }
+      }
+
       return true;
     } catch (e) {
       if (kDebugMode) {

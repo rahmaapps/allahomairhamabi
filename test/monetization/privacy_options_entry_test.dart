@@ -151,6 +151,47 @@ void main() {
     });
   });
 
+  group('PrivacyOptionsEntry — activation Ads post-consentement (A2)', () {
+    test(
+        'après fermeture du formulaire, le système d\'activation Ads est '
+        'notifié — sans redémarrage de l\'application', () async {
+      final consent = FakeConsentService()..privacyOptionsRequiredValue = true;
+      var settledCount = 0;
+      final entry = PrivacyOptionsEntry(
+        consentService: consent,
+        onConsentSettled: () async => settledCount++,
+      );
+
+      expect(await entry.open(), isTrue);
+
+      expect(consent.showPrivacyOptionsFormCallCount, 1);
+      expect(settledCount, 1);
+    });
+
+    test('formulaire en échec : aucune activation tentée', () async {
+      var settledCount = 0;
+      final entry = PrivacyOptionsEntry(
+        consentService: _ThrowingConsentService(throwOnShowForm: true),
+        onConsentSettled: () async => settledCount++,
+      );
+
+      expect(await entry.open(), isFalse);
+      expect(settledCount, 0);
+    });
+
+    test(
+        'échec de l\'activation Ads : l\'ouverture du formulaire reste un '
+        'succès et rien n\'est propagé', () async {
+      final consent = FakeConsentService()..privacyOptionsRequiredValue = true;
+      final entry = PrivacyOptionsEntry(
+        consentService: consent,
+        onConsentSettled: () async => throw Exception('SDK indisponible'),
+      );
+
+      expect(await entry.open(), isTrue);
+    });
+  });
+
   group('PrivacyOptionsEntry — périmètre', () {
     test('ne dépend que de l\'interface ConsentService du LOT 5.A', () {
       // Un fake suffit à piloter entièrement la classe : aucune dépendance

@@ -37,17 +37,15 @@
             android:name="flutterEmbedding"
             android:value="2" />
 
-        <!-- LOT 5.A — App ID de TEST officiel Google Mobile Ads
-             (https://developers.google.com/admob/android/test-ads),
-             obligatoire pour initialiser le SDK même sans afficher la
-             moindre publicité. Ce n'est PAS un id de production — à
-             remplacer par le véritable App ID AdMob uniquement lors du lot
-             qui active réellement l'affichage de publicités (hors
-             périmètre 5.A). Valeur miroir de
-             lib/monetization/ads_config.dart (AdsConfig.testAppId). -->
+        <!-- LOT 5.F — App ID AdMob injecté par Gradle à partir de
+             android/ads_ids.properties, selon l'environnement sélectionné
+             par le dart-define ADS_ENV (test | production, défaut : test).
+             Plus aucune valeur en dur ici : le manifest et
+             lib/monetization/ads_config.dart ne peuvent plus diverger sans
+             que test/monetization/ads_config_test.dart échoue. -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-3940256099942544~3347511713" />
+            android:value="${admobAppId}" />
 
         <activity
             android:name=".MainActivity"

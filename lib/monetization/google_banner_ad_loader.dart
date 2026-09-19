@@ -49,7 +49,7 @@ class GoogleBannerAdLoader implements BannerAdLoader {
 
     final bannerAd = BannerAd(
       size: size,
-      adUnitId: AdsConfig.testBannerAdUnitId,
+      adUnitId: AdsConfig.bannerAdUnitId,
       request: const AdRequest(),
       listener: BannerAdListener(
         onAdLoaded: (ad) {

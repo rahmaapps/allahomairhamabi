@@ -74,7 +74,7 @@ class GoogleInterstitialAdLoader implements InterstitialAdLoader {
 
     try {
       await InterstitialAd.load(
-        adUnitId: AdsConfig.testInterstitialAdUnitId,
+        adUnitId: AdsConfig.interstitialAdUnitId,
         request: const AdRequest(),
         adLoadCallback: InterstitialAdLoadCallback(
           onAdLoaded: (ad) {

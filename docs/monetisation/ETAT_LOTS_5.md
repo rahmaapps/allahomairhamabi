@@ -10,7 +10,8 @@
 | **5.B** | Bannières | **TERMINÉ** | `d0784fd` |
 | **5.C** | Interstitiels | **TERMINÉ** | `d0784fd` |
 | **5.D** | Évaluation / In-App Review | **VALIDÉ / TERMINÉ** | `547a95b` |
-| **5.E** | Privacy Options + Privacy Policy + Documentation + Git hygiene | **TERMINÉ** *(sous réserve de l'audit produit)* | voir commit LOT 5.E |
+| **5.E** | Privacy Options + Privacy Policy + Documentation + Git hygiene | **TERMINÉ** *(sous réserve de l'audit produit)* | `d1483dd` |
+| **5.F** | Préparation production : séparation test/production, App ID unique, test device, `maxAdContentRating`, correction A2 | **TERMINÉ** *(sous réserve de l'audit produit)* | voir commit LOT 5.F |
 
 ---
 
@@ -60,6 +61,34 @@ Lot de **conformité, documentation et hygiène** — aucune fonctionnalité de 
 
 **Aucune** modification fonctionnelle des lots 5.A à 5.D.
 
+## LOT 5.F — Préparation production
+
+Lot **technique** : aucune décision produit modifiée, aucune surface publicitaire touchée, aucun identifiant de production inventé.
+
+- **Environnement explicite** : `--dart-define=ADS_ENV=test|production`, **défaut `test`**. Un build release ordinaire reste en test ; la production ne s'active jamais implicitement.
+- **Source unique de vérité pour l'App ID** : `android/ads_ids.properties`, lu par Gradle pour alimenter le placeholder `${admobAppId}` du manifest, et contrôlé côté Dart par `test/monetization/ads_config_test.dart`. Le manifest ne peut plus diverger de `AdsConfig`.
+- **Fail-fast** : un build `ADS_ENV=production` échoue tant que les identifiants réels ne sont pas renseignés, et une valeur `ADS_ENV` invalide échoue aussi.
+- **Accesseurs neutres** : `AdsConfig.appId` / `bannerAdUnitId` / `interstitialAdUnitId` — **une seule** unité Banner pour HOME, Recherche et Favoris (les surfaces restent distinguées par `AdSurface`).
+- **Appareils de test** : `--dart-define=ADS_TEST_DEVICE_IDS=<id1>,<id2>`, vide par défaut, jamais committé.
+- **`maxAdContentRating = G`** appliqué au point central d'initialisation. **Plafond déclaratif, pas une garantie de filtrage** : le blocage de catégories se fait dans la console AdMob et se contrôle a posteriori dans l'Ad Review Center.
+- **Correction A2** : `AdsActivation` rejoue le contrôle `canRequestAds()` après la fermeture des options de confidentialité — le SDK devient initialisable dans la même session, sans redémarrage. Idempotent, sûr en concurrence, non bloquant, n'affiche aucune publicité. Un refus continue d'interdire toute requête.
+
+### Commandes de build
+
+```bash
+# Développement / QA — identifiants de démonstration Google (défaut)
+flutter build apk --debug
+flutter build apk --release
+
+# Production — refusé tant que les identifiants réels ne sont pas renseignés
+flutter build appbundle --release --dart-define=ADS_ENV=production
+
+# Validation sur appareil réel avec identifiants de production
+flutter build apk --release --dart-define=ADS_ENV=production --dart-define=ADS_TEST_DEVICE_IDS=<ID_APPAREIL>
+```
+
+Pour passer en production : renseigner les six valeurs réelles dans `android/ads_ids.properties` **et** les trois constantes `production*` de `lib/monetization/ads_config.dart` (le test de cohérence échoue si les deux divergent).
+
 ---
 
 ## Hors périmètre — volontairement non fait
@@ -68,9 +97,8 @@ Ces points restent **bloquants pour une mise en production réelle** de la moné
 
 | Élément | Nature | Raison |
 |---|---|---|
-| **Vrais identifiants AdMob de production** (App ID, Ad Units) | Configuration externe + code | Aucun compte/unité de production disponible ; l'app n'utilise que les identifiants de **test** Google |
-| Séparation test / production des identifiants, `testDeviceIds` | Code | Dépend des identifiants de production |
-| `maxAdContentRating` et blocage de catégories publicitaires | Code + console AdMob | Lot de filtrage ultérieur ; aucun filtrage ne garantit 0 publicité indésirable |
+| **Vrais identifiants AdMob de production** (App ID, Ad Units) | Configuration externe | Le mécanisme de bascule existe (LOT 5.F) ; seules les **valeurs** manquent — compte et unités AdMob à créer |
+| Blocage de catégories publicitaires (Blocking controls, Ad Review Center) | Console AdMob | Configuration manuelle ; aucun filtrage ne garantit 0 publicité indésirable |
 | **Configuration finale Play Console** : déclaration « contient des annonces », Sécurité des données (identifiant publicitaire), URL de politique, classification du contenu, public cible, `versionCode` | Externe | Hors périmètre de tout lot technique |
 | **Publication** de la politique de confidentialité mise à jour | Externe | Les fichiers sont à jour dans le dépôt ; leur mise en ligne est une action de publication distincte |
 | **Rewarded réel** (chargement, présentation, `onUserEarnedReward`, points d'appel UI) | Code + décision produit | Architecture seule à ce jour (D14) |
