@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'monetization/privacy_options_entry.dart';
 import 'notification_service.dart';
 import 'theme/app_colors.dart';
 import 'theme/app_spacing.dart';
@@ -74,6 +75,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   bool _loading = true;
 
+  /// LOT 5.E — entrée « خيارات الخصوصية ». Le statut est réinterrogé à
+  /// chaque ouverture de cet écran (une nouvelle instance d'état est créée
+  /// à chaque navigation) : il n'est jamais déduit d'un état UMP mis en
+  /// cache au démarrage, qui peut ne pas être encore exploitable.
+  final PrivacyOptionsEntry _privacyOptions = PrivacyOptionsEntry();
+  bool _privacyOptionsRequired = false;
+
   @override
   void initState() {
     super.initState();
@@ -86,6 +94,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
     // Le nettoyage de l'ancienne tâche `period_afternoon` (compatibilité
     // utilisateurs existants) vit désormais dans `main()` — exécuté au
     // démarrage réel de l'app, indépendamment de l'ouverture de cet écran.
+
+    // LOT 5.E — après `_loadPrefs()` : l'affichage des réglages ne doit
+    // jamais attendre une réponse du SDK de consentement.
+    await _refreshPrivacyOptionsRequirement();
+  }
+
+  /// Ne lève jamais (garantie de [PrivacyOptionsEntry]) : au pire la ligne
+  /// reste absente.
+  Future<void> _refreshPrivacyOptionsRequirement() async {
+    final required = await _privacyOptions.isRequired();
+    if (!mounted) return;
+    if (required == _privacyOptionsRequired) return;
+    setState(() => _privacyOptionsRequired = required);
   }
 
   Future<void> _loadPrefs() async {
@@ -266,6 +287,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await Share.share(_shareAppText);
   }
 
+  /// « خيارات الخصوصية » (LOT 5.E) — ouvre le formulaire UMP d'options de
+  /// confidentialité, seul moyen pour l'utilisateur de revenir sur son
+  /// consentement publicitaire. Même traitement d'erreur que
+  /// [_openAbout] : un toast arabe déjà existant (`showAppToast`), jamais
+  /// un crash, jamais un blocage de l'écran.
+  Future<void> _openPrivacyOptions() async {
+    final opened = await _privacyOptions.open();
+    if (!mounted) return;
+
+    if (!opened) {
+      showAppToast(context, 'تعذّر فتح خيارات الخصوصية');
+      return;
+    }
+
+    // Le statut a pu changer pendant l'affichage du formulaire.
+    await _refreshPrivacyOptionsRequirement();
+  }
+
   Future<void> _openAbout() async {
     final uri = Uri.parse(
       'https://rahmaapps.github.io/allahomairhamabi/',
@@ -353,6 +392,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                           const _RowDivider(),
                           _SettingsLinkRow(label: 'عن التطبيق', onTap: _openAbout),
+                          // LOT 5.E — présente UNIQUEMENT quand Google
+                          // exige un point d'entrée « Options de
+                          // confidentialité » (`isPrivacyOptionsRequired`).
+                          // Absente sinon : jamais une ligne grisée, même
+                          // traitement que la ligne d'heure d'un rappel
+                          // désactivé.
+                          if (_privacyOptionsRequired) ...[
+                            const _RowDivider(),
+                            _SettingsLinkRow(
+                              label: 'خيارات الخصوصية',
+                              onTap: _openPrivacyOptions,
+                            ),
+                          ],
                           const _RowDivider(),
                           _SettingsLinkRow(label: 'مشاركة التطبيق', onTap: _shareApp),
                         ],
