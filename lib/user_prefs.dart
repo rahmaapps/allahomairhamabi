@@ -69,6 +69,16 @@ class UserPrefs {
   // interstitiels, pas fenêtre « sans publicité » accordée par un Rewarded.
   static const _kLastInterstitialShownAt = 'last_interstitial_shown_at';
 
+  // Évaluation de l'application (LOT 5.D) — date du tout premier usage,
+  // écrite UNE SEULE FOIS. Concept distinct de `settings_completed` (fin
+  // d'onboarding, progression fonctionnelle) : mesure uniquement
+  // l'ancienneté de l'installation. Aucun compteur d'ouvertures, de
+  // sessions ni de douʿās n'en est dérivé (décision produit D2).
+  static const _kFirstOpenAt = 'first_open_at';
+
+  // Évaluation de l'application (LOT 5.D) — dernière sollicitation émise.
+  static const _kLastReviewPromptedAt = 'last_review_prompted_at';
+
   // ============================================================
   // 🔔 NOTIFICATIONS — SWITCHS
   // ============================================================
@@ -283,6 +293,61 @@ class UserPrefs {
       await sp.remove(_kLastInterstitialShownAt);
     } else {
       await sp.setInt(_kLastInterstitialShownAt, shownAt.millisecondsSinceEpoch);
+    }
+  }
+
+  // ============================================================
+  // ⭐ ÉVALUATION DE L'APPLICATION (LOT 5.D)
+  // ============================================================
+  /// Date du tout premier usage, ou `null` si jamais enregistrée. Sert
+  /// uniquement au critère d'ancienneté (≥ 7 jours) avant une éventuelle
+  /// demande d'évaluation. Stockée en `millisecondsSinceEpoch`, comme les
+  /// autres dates de ce fichier.
+  Future<DateTime?> getFirstOpenAt() async {
+    final sp = await _prefs();
+    final millis = sp.getInt(_kFirstOpenAt);
+    if (millis == null) return null;
+    return DateTime.fromMillisecondsSinceEpoch(millis);
+  }
+
+  Future<void> setFirstOpenAt(DateTime? at) async {
+    final sp = await _prefs();
+    if (at == null) {
+      await sp.remove(_kFirstOpenAt);
+    } else {
+      await sp.setInt(_kFirstOpenAt, at.millisecondsSinceEpoch);
+    }
+  }
+
+  /// Écriture unique : la date déjà persistée n'est JAMAIS écrasée, sans
+  /// quoi l'ancienneté repartirait de zéro à chaque lancement et le critère
+  /// des 7 jours ne serait jamais atteint.
+  Future<void> recordFirstOpenIfAbsent({DateTime? now}) async {
+    final sp = await _prefs();
+    if (sp.getInt(_kFirstOpenAt) != null) return;
+    await sp.setInt(
+      _kFirstOpenAt,
+      (now ?? DateTime.now()).millisecondsSinceEpoch,
+    );
+  }
+
+  /// Instant de la dernière sollicitation d'évaluation **émise**, ou `null`
+  /// si aucune ne l'a jamais été. Google ne renvoyant jamais l'issue réelle
+  /// du dialogue (noté / fermé / non affiché), c'est l'émission de la
+  /// demande — et elle seule — qui consomme le cooldown de 90 jours.
+  Future<DateTime?> getLastReviewPromptedAt() async {
+    final sp = await _prefs();
+    final millis = sp.getInt(_kLastReviewPromptedAt);
+    if (millis == null) return null;
+    return DateTime.fromMillisecondsSinceEpoch(millis);
+  }
+
+  Future<void> setLastReviewPromptedAt(DateTime? at) async {
+    final sp = await _prefs();
+    if (at == null) {
+      await sp.remove(_kLastReviewPromptedAt);
+    } else {
+      await sp.setInt(_kLastReviewPromptedAt, at.millisecondsSinceEpoch);
     }
   }
 

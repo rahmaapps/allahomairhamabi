@@ -13,6 +13,8 @@ import 'models/dua.dart';
 import 'monetization/ad_surface.dart';
 import 'monetization/interstitial_ad_controller.dart';
 import 'monetization/interstitial_trigger.dart';
+import 'review/review_prompt_controller.dart';
+import 'review/review_trigger.dart';
 import 'user_prefs.dart';
 import 'settings_screen.dart';
 import 'favorites_screen.dart';
@@ -797,13 +799,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       context,
       MaterialPageRoute(builder: (_) => const FavoritesScreen()),
     );
-    // LOT 5.C — transition naturelle Favoris → HOME. Appelé APRÈS le
-    // retour (la navigation est déjà terminée) et jamais attendu : la
-    // navigation ne dépend en rien de la disponibilité d'une publicité.
-    unawaited(
-      InterstitialAdController.instance
-          .maybeShowOnTransition(InterstitialTrigger.leavingFavorites),
-    );
+    // LOT 5.C + LOT 5.D — transition naturelle Favoris → HOME. Appelé APRÈS
+    // le retour (la navigation est déjà terminée) et jamais attendu : la
+    // navigation ne dépend ni de la disponibilité d'une publicité, ni de
+    // celle du mécanisme d'évaluation.
+    unawaited(_runPostFavoritesTransition());
 
     if (!mounted || _currentId == null) return;
 
@@ -811,9 +811,33 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     if (mounted) setState(() => _isFavorite = isFav);
   }
 
+  /// Suites de la transition Favoris → HOME, séquencées volontairement.
+  ///
+  /// La demande d'évaluation (LOT 5.D) n'est évaluée qu'une fois la
+  /// décision publicitaire tranchée : c'est la seule façon de garantir
+  /// qu'aucune sollicitation n'arrive pendant ni immédiatement autour d'un
+  /// interstitiel, les deux mécanismes partageant cette même transition
+  /// (décision D6). Seul leur ORDRE est fixé ici — les deux services
+  /// restent entièrement distincts et s'ignorent l'un l'autre.
+  Future<void> _runPostFavoritesTransition() async {
+    await InterstitialAdController.instance
+        .maybeShowOnTransition(InterstitialTrigger.leavingFavorites);
+
+    // La décision publicitaire ci-dessus peut prendre plusieurs secondes
+    // (chargement réseau). Entre-temps, l'utilisateur a pu quitter HOME
+    // pour DuaRead ou Grave Visit, où toute sollicitation est interdite
+    // (D6) : on ne sollicite que si HOME est encore l'écran courant.
+    if (!mounted) return;
+    if (!(ModalRoute.of(context)?.isCurrent ?? false)) return;
+
+    await ReviewPromptController.instance
+        .maybeRequestOnTransition(ReviewTrigger.leavingFavorites);
+  }
+
   /// Recherche — même traitement que `_openFavorites` pour la transition
-  /// Recherche → HOME (LOT 5.C). Aucun état de HOME à resynchroniser au
-  /// retour (les résultats de recherche ne portent pas de ♥).
+  /// Recherche → HOME (LOT 5.C). Aucune demande d'évaluation n'est émise
+  /// sur cette transition : le déclencheur est verrouillé au seul retour
+  /// Favoris → HOME (LOT 5.D, décision D1).
   Future<void> _openSearch() async {
     await Navigator.push(
       context,

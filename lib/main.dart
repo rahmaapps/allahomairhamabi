@@ -42,6 +42,14 @@ Future<void> main() async {
   final favoritesWereReset =
       await UserPrefs.migrateFavoritesToGlobalIdsIfNeeded();
 
+  // LOT 5.D — date du tout premier usage, écrite une seule fois et jamais
+  // écrasée. Unique état d'usage persisté par ce lot : il sert au seul
+  // critère d'ancienneté (≥ 7 jours) avant une éventuelle demande
+  // d'évaluation, et ne compte ni les ouvertures, ni les sessions, ni les
+  // douʿās consultés (décision D2). Aucune sollicitation n'est émise ici :
+  // le lancement est une transition explicitement exclue (D6).
+  await UserPrefs.instance.recordFirstOpenIfAbsent();
+
   // LOT [reboot/exactAllowWhileIdle] — `workmanager` retiré du projet (plus
   // aucun rôle : les rappels sont désormais planifiés via
   // `NotificationService`/`zonedSchedule`, avec reprise après reboot gérée
