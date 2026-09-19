@@ -60,6 +60,15 @@ class UserPrefs {
   // Thème
   static const _kThemeMode = 'theme_mode'; // "light" | "dark" | "system"
 
+  // Monétisation — suppression temporaire des publicités (LOT 5.A socle ;
+  // affichage réel des publicités et déclenchement Rewarded hors périmètre).
+  static const _kAdsSuppressedUntil = 'ads_suppressed_until';
+
+  // Monétisation — dernier interstitiel effectivement présenté (LOT 5.C).
+  // Concept DISTINCT de `_kAdsSuppressedUntil` : espacement entre deux
+  // interstitiels, pas fenêtre « sans publicité » accordée par un Rewarded.
+  static const _kLastInterstitialShownAt = 'last_interstitial_shown_at';
+
   // ============================================================
   // 🔔 NOTIFICATIONS — SWITCHS
   // ============================================================
@@ -228,6 +237,53 @@ class UserPrefs {
   Future<String> getThemeMode() async {
     final sp = await _prefs();
     return sp.getString(_kThemeMode) ?? 'system';
+  }
+
+  // ============================================================
+  // 🚫 MONÉTISATION — suppression temporaire des publicités
+  // ============================================================
+  /// `null` = aucune suppression temporaire active (jamais accordée, ou
+  /// expirée). Stockée en `millisecondsSinceEpoch` — persistante entre les
+  /// sessions, comme l'exige le socle LOT 5.A.
+  Future<DateTime?> getAdsSuppressedUntil() async {
+    final sp = await _prefs();
+    final millis = sp.getInt(_kAdsSuppressedUntil);
+    if (millis == null) return null;
+    return DateTime.fromMillisecondsSinceEpoch(millis);
+  }
+
+  /// `null` efface la suppression (ex. après expiration constatée par
+  /// l'appelant) ; une valeur non-nulle la (re)définit.
+  Future<void> setAdsSuppressedUntil(DateTime? until) async {
+    final sp = await _prefs();
+    if (until == null) {
+      await sp.remove(_kAdsSuppressedUntil);
+    } else {
+      await sp.setInt(_kAdsSuppressedUntil, until.millisecondsSinceEpoch);
+    }
+  }
+
+  // ============================================================
+  // ⏳ MONÉTISATION — cooldown interstitiel (LOT 5.C)
+  // ============================================================
+  /// Instant de la dernière présentation **effective** d'un interstitiel,
+  /// ou `null` si aucun n'a jamais été présenté. Persistant entre les
+  /// sessions : le cooldown de 10 minutes survit à un redémarrage de l'app.
+  Future<DateTime?> getLastInterstitialShownAt() async {
+    final sp = await _prefs();
+    final millis = sp.getInt(_kLastInterstitialShownAt);
+    if (millis == null) return null;
+    return DateTime.fromMillisecondsSinceEpoch(millis);
+  }
+
+  /// `null` réinitialise le cooldown (aucun interstitiel présenté connu).
+  Future<void> setLastInterstitialShownAt(DateTime? shownAt) async {
+    final sp = await _prefs();
+    if (shownAt == null) {
+      await sp.remove(_kLastInterstitialShownAt);
+    } else {
+      await sp.setInt(_kLastInterstitialShownAt, shownAt.millisecondsSinceEpoch);
+    }
   }
 
   static Future<void> saveSelectedPersons(List<String> persons) async {

@@ -1,0 +1,31 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:test_1/monetization/reward_kind.dart';
+import 'package:test_1/monetization/reward_service.dart';
+
+void main() {
+  group('RewardKind', () {
+    test('expose exactement les deux usages verrouillés produit', () {
+      expect(RewardKind.values, [
+        RewardKind.temporaryAdRemoval,
+        RewardKind.shareAsImageUnlock,
+      ]);
+    });
+  });
+
+  group('NoopRewardService (audit LOT 5.A §12 : aucun Rewarded réel)', () {
+    test('ne grant jamais de récompense, quel que soit le RewardKind',
+        () async {
+      const service = NoopRewardService();
+
+      for (final kind in RewardKind.values) {
+        expect(await service.requestReward(kind), isFalse);
+      }
+    });
+
+    test('implémente bien l\'interface RewardService (contrat respecté)',
+        () {
+      const RewardService service = NoopRewardService();
+      expect(service, isA<RewardService>());
+    });
+  });
+}

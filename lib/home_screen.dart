@@ -10,6 +10,9 @@ import 'package:share_plus/share_plus.dart';
 
 import 'dua_repository.dart';
 import 'models/dua.dart';
+import 'monetization/ad_surface.dart';
+import 'monetization/interstitial_ad_controller.dart';
+import 'monetization/interstitial_trigger.dart';
 import 'user_prefs.dart';
 import 'settings_screen.dart';
 import 'favorites_screen.dart';
@@ -17,6 +20,7 @@ import 'search_screen.dart';
 import 'screens/person_selection_screen.dart';
 import 'screens/grave_visit_read_screen.dart';
 import 'premium_templates.dart';
+import 'widgets/banner_ad_slot.dart';
 import 'widgets/premium_export_card.dart';
 import 'dua_personalizer.dart';
 import 'theme/app_colors.dart';
@@ -793,10 +797,32 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       context,
       MaterialPageRoute(builder: (_) => const FavoritesScreen()),
     );
+    // LOT 5.C — transition naturelle Favoris → HOME. Appelé APRÈS le
+    // retour (la navigation est déjà terminée) et jamais attendu : la
+    // navigation ne dépend en rien de la disponibilité d'une publicité.
+    unawaited(
+      InterstitialAdController.instance
+          .maybeShowOnTransition(InterstitialTrigger.leavingFavorites),
+    );
+
     if (!mounted || _currentId == null) return;
 
     final isFav = await UserPrefs.instance.isFavorite(_currentId!);
     if (mounted) setState(() => _isFavorite = isFav);
+  }
+
+  /// Recherche — même traitement que `_openFavorites` pour la transition
+  /// Recherche → HOME (LOT 5.C). Aucun état de HOME à resynchroniser au
+  /// retour (les résultats de recherche ne portent pas de ♥).
+  Future<void> _openSearch() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const SearchScreen()),
+    );
+    unawaited(
+      InterstitialAdController.instance
+          .maybeShowOnTransition(InterstitialTrigger.leavingSearch),
+    );
   }
 
   /// Libellés possessifs déjà établis (`أبي`, `أمي`...) — repris tels
@@ -1271,8 +1297,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 IconButton(
                   tooltip: 'البحث',
                   icon: Icon(Icons.search, color: appBarForeground),
-                  onPressed: () => Navigator.push(
-                      context, MaterialPageRoute(builder: (_) => const SearchScreen())),
+                  onPressed: _openSearch,
                 ),
                 IconButton(
                   tooltip: 'المفضلة',
@@ -1316,6 +1341,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 child: bodyContent,
               ),
             ),
+            // LOT 5.B — bannière adaptive anchored : hauteur nulle tant
+            // qu'aucune annonce n'est chargée, jamais de chevauchement avec
+            // le contenu (`bottomNavigationBar` est un slot Scaffold séparé
+            // du `body`, qui n'affecte son layout interne que par la
+            // hauteur réellement rendue ici).
+            bottomNavigationBar: const BannerAdSlot(surface: AdSurface.home),
           ),
 
           // ---- Rendu hors écran pour l'export Premium (capture PNG) ----

@@ -18,6 +18,15 @@
          (ScheduledNotificationBootReceiver ci-dessous). -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- LOT 5.A — socle Monétisation/UMP (google_mobile_ads) : requis pour
+         toute mise à jour de consentement et, plus tard, toute requête
+         publicitaire réelle. Absentes du manifest de release jusqu'ici
+         (seuls les manifests debug/profile de l'outillage Flutter les
+         déclaraient) — gap comblé par ce lot, indépendamment de
+         l'affichage de publicités (hors périmètre 5.A). -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
     <application
 
         android:icon="@mipmap/ic_launcher"
@@ -27,6 +36,18 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- LOT 5.A — App ID de TEST officiel Google Mobile Ads
+             (https://developers.google.com/admob/android/test-ads),
+             obligatoire pour initialiser le SDK même sans afficher la
+             moindre publicité. Ce n'est PAS un id de production — à
+             remplacer par le véritable App ID AdMob uniquement lors du lot
+             qui active réellement l'affichage de publicités (hors
+             périmètre 5.A). Valeur miroir de
+             lib/monetization/ads_config.dart (AdsConfig.testAppId). -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-3940256099942544~3347511713" />
 
         <activity
             android:name=".MainActivity"

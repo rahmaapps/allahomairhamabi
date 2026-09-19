@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'home_screen.dart';
+import 'monetization/monetization_bootstrap.dart';
 import 'screens/onboarding_screen.dart';
 import 'settings_screen.dart';
 import 'notification_service.dart';
@@ -79,6 +82,12 @@ Future<void> main() async {
             ?.pushNamedAndRemoveUntil('/home', (route) => false);
     }
   };
+
+  // LOT 5.A — socle Monétisation/UMP : mise à jour du consentement à
+  // chaque lancement, jamais `await`ée avant `runApp` pour ne pas retarder
+  // le premier frame (audit §7). Aucune publicité n'est chargée ni
+  // affichée par cet appel — voir lib/monetization/monetization_bootstrap.dart.
+  unawaited(MonetizationBootstrap.runAtLaunch());
 
   // 👉 On enveloppe l'app avec le provider du thème
   runApp(

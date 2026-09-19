@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'dua_repository.dart';
 import 'models/dua.dart';
+import 'monetization/ad_surface.dart';
 import 'screens/dua_read_screen.dart';
 import 'user_prefs.dart';
 import 'theme/app_colors.dart';
@@ -10,6 +11,7 @@ import 'theme/app_typography.dart';
 import 'widgets/app_bar.dart';
 import 'widgets/app_dua_result_card.dart';
 import 'widgets/app_empty_state.dart';
+import 'widgets/banner_ad_slot.dart';
 import 'widgets/app_snackbar.dart';
 
 /// Favoris — spécification close (docs/ui_ux/ETAT_CONSOLIDE_UI_UX.md, §4 ;
@@ -210,6 +212,9 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
               );
             },
           ),
+          // LOT 5.B — bannière adaptive anchored, même stratégie que HOME
+          // (hauteur nulle par défaut, cf. widgets/banner_ad_slot.dart).
+          bottomNavigationBar: const BannerAdSlot(surface: AdSurface.favorites),
         ),
       ),
     );
