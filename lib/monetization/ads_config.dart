@@ -83,22 +83,25 @@ class AdsConfig {
   // Identifiants de PRODUCTION
   // ==========================================================
 
-  /// Préfixe des valeurs non encore renseignées. Aucun identifiant de
-  /// production n'est inventé : les vraies valeurs seront injectées ici et
-  /// dans `android/ads_ids.properties` une fois le compte et les unités
-  /// AdMob créés.
+  /// Préfixe des valeurs non encore renseignées. Conservé après le
+  /// raccordement des identifiants réels : il reste la condition du
+  /// fail-fast Gradle, et protège une future unité ajoutée mais non
+  /// renseignée.
   static const String productionPlaceholderPrefix = 'PLACEHOLDER_PRODUCTION_';
 
-  static const String productionAppId = 'PLACEHOLDER_PRODUCTION_APP_ID';
+  /// Identifiants réels de l'éditeur, raccordés après création du compte et
+  /// des unités AdMob. Miroir strict de `android/ads_ids.properties` —
+  /// toute divergence fait échouer `ads_config_test.dart`.
+  static const String productionAppId = 'ca-app-pub-2998944710358464~3134659675';
 
   /// **Une seule** unité Banner pour les trois surfaces autorisées (HOME,
   /// Recherche, Favoris) — décision produit LOT 5.F. La distinction des
   /// surfaces reste portée par `AdSurface`, jamais par l'unité.
   static const String productionBannerAdUnitId =
-      'PLACEHOLDER_PRODUCTION_BANNER_AD_UNIT_ID';
+      'ca-app-pub-2998944710358464/4992782235';
 
   static const String productionInterstitialAdUnitId =
-      'PLACEHOLDER_PRODUCTION_INTERSTITIAL_AD_UNIT_ID';
+      'ca-app-pub-2998944710358464/7219490327';
 
   static bool isProductionPlaceholder(String value) =>
       value.startsWith(productionPlaceholderPrefix);

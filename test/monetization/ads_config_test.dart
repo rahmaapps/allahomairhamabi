@@ -111,10 +111,46 @@ void main() {
       }
     });
 
-    test('la production reste signalée comme non renseignée', () {
-      // Se retournera de lui-même le jour où les vrais IDs seront injectés,
-      // ce qui est le signal attendu.
-      expect(AdsConfig.hasProductionIds, isFalse);
+    test('les identifiants de production sont renseignés', () {
+      expect(AdsConfig.hasProductionIds, isTrue);
+    });
+
+    test(
+        'aucun identifiant de TEST ne peut se retrouver dans le chemin '
+        'production', () {
+      expect(AdsConfig.productionAppId, isNot(AdsConfig.testAppId));
+      expect(
+        AdsConfig.productionBannerAdUnitId,
+        isNot(anyOf(
+          AdsConfig.testAndroidBannerAdUnitId,
+          AdsConfig.testIosBannerAdUnitId,
+        )),
+      );
+      expect(
+        AdsConfig.productionInterstitialAdUnitId,
+        isNot(anyOf(
+          AdsConfig.testAndroidInterstitialAdUnitId,
+          AdsConfig.testIosInterstitialAdUnitId,
+        )),
+      );
+    });
+
+    test('les 3 identifiants de production viennent du MÊME compte AdMob', () {
+      // Attrape une erreur de copier-coller entre comptes : l'App ID et les
+      // deux unités doivent partager le même identifiant éditeur.
+      final publisher = AdsConfig.productionAppId.split('~').first;
+
+      expect(publisher, startsWith('ca-app-pub-'));
+      expect(AdsConfig.productionBannerAdUnitId, startsWith('$publisher/'));
+      expect(AdsConfig.productionInterstitialAdUnitId,
+          startsWith('$publisher/'));
+    });
+
+    test('Banner et Interstitial sont deux unités distinctes', () {
+      expect(
+        AdsConfig.productionBannerAdUnitId,
+        isNot(AdsConfig.productionInterstitialAdUnitId),
+      );
     });
 
     test('formes attendues : « ~ » pour un App ID, « / » pour une unité', () {
