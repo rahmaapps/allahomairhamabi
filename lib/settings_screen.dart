@@ -4,7 +4,9 @@ import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'monetization/ad_free_hour_entry.dart';
 import 'monetization/privacy_options_entry.dart';
+import 'monetization/rewarded_wording.dart';
 import 'notification_service.dart';
 import 'theme/app_colors.dart';
 import 'theme/app_spacing.dart';
@@ -14,6 +16,7 @@ import 'user_prefs.dart';
 import 'widgets/app_bar.dart';
 import 'widgets/app_card.dart';
 import 'widgets/app_snackbar.dart';
+import 'widgets/rewarded_confirmation_sheet.dart';
 
 /// Conservée uniquement pour compatibilité avec
 /// `test/settings_screen_lot3g_test.dart` (logique pure de replanification
@@ -82,6 +85,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final PrivacyOptionsEntry _privacyOptions = PrivacyOptionsEntry();
   bool _privacyOptionsRequired = false;
 
+  /// LOT 5.G.B — ligne « une heure sans publicité » (B1). État relu à
+  /// chaque ouverture de l'écran, jamais mis en cache.
+  final AdFreeHourEntry _adFreeHour = AdFreeHourEntry();
+
   @override
   void initState() {
     super.initState();
@@ -98,6 +105,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
     // LOT 5.E — après `_loadPrefs()` : l'affichage des réglages ne doit
     // jamais attendre une réponse du SDK de consentement.
     await _refreshPrivacyOptionsRequirement();
+
+    // LOT 5.G.B — même principe : l'affichage des réglages n'attend jamais
+    // l'état publicitaire.
+    await _adFreeHour.refresh();
+  }
+
+  @override
+  void dispose() {
+    _adFreeHour.dispose();
+    super.dispose();
   }
 
   /// Ne lève jamais (garantie de [PrivacyOptionsEntry]) : au pire la ligne
@@ -392,6 +409,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                           const _RowDivider(),
                           _SettingsLinkRow(label: 'عن التطبيق', onTap: _openAbout),
+                          // LOT 5.G.B — B1 : exactement entre « عن التطبيق »
+                          // et « خيارات الخصوصية ». Porte elle-même son
+                          // séparateur : absente, elle ne laisse aucune trace.
+                          AdFreeHourSettingsRow(entry: _adFreeHour),
                           // LOT 5.E — présente UNIQUEMENT quand Google
                           // exige un point d'entrée « Options de
                           // confidentialité » (`isPrivacyOptionsRequired`).
@@ -585,6 +606,95 @@ class _ThemeRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// LOT 5.G.B — ligne « une heure sans publicité » (B1/B3/B5/B6).
+///
+/// Publique pour être testée seule : `SettingsScreen` n'est pas testable en
+/// widget (`_bootstrap()` attend un canal de plateforme natif), limitation
+/// déjà documentée dans ce projet. Réutilise strictement `_SettingsLinkRow`
+/// et `_RowDivider` — aucun nouveau style.
+///
+/// - Heure active : jamais masquée ni désactivée (B5), temps restant réel.
+/// - Hors fenêtre : présente seulement si un Rewarded peut réellement être
+///   proposé ; absente sinon, séparateur compris.
+/// - Tap : confirmation → Rewarded → toast de succès (B6). Un échec ou une
+///   fermeture anticipée ramène simplement à l'invitation, sans message.
+class AdFreeHourSettingsRow extends StatefulWidget {
+  const AdFreeHourSettingsRow({
+    super.key,
+    required this.entry,
+    this.confirm = showRewardedConfirmation,
+  });
+
+  final AdFreeHourEntry entry;
+
+  /// Injection réservée aux tests ; confirmation réelle par défaut.
+  final Future<bool> Function(BuildContext context) confirm;
+
+  @override
+  State<AdFreeHourSettingsRow> createState() => _AdFreeHourSettingsRowState();
+}
+
+class _AdFreeHourSettingsRowState extends State<AdFreeHourSettingsRow> {
+  @override
+  void initState() {
+    super.initState();
+    widget.entry.addListener(_onEntryChanged);
+  }
+
+  @override
+  void didUpdateWidget(AdFreeHourSettingsRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.entry != widget.entry) {
+      oldWidget.entry.removeListener(_onEntryChanged);
+      widget.entry.addListener(_onEntryChanged);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.entry.removeListener(_onEntryChanged);
+    super.dispose();
+  }
+
+  void _onEntryChanged() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _onTap() async {
+    final entry = widget.entry;
+    if (entry.state == AdFreeHourEntryState.loading) return;
+
+    final result = await entry.activate(confirm: () => widget.confirm(context));
+    if (!mounted) return;
+
+    switch (result) {
+      case AdFreeHourResult.earned:
+        showAppToast(context, RewardedWording.adFreeHourEarned);
+      case AdFreeHourResult.alreadyActive:
+        // B3/B5 : aucun Rewarded, le temps restant est rappelé.
+        showAppToast(context, entry.label);
+      case AdFreeHourResult.cancelled:
+      case AdFreeHourResult.notEarned:
+        // Aucun message : la ligne revient simplement à l'invitation.
+        break;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final entry = widget.entry;
+    if (!entry.isVisible) return const SizedBox.shrink();
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const _RowDivider(),
+        _SettingsLinkRow(label: entry.label, onTap: _onTap),
+      ],
     );
   }
 }

@@ -514,8 +514,9 @@ void main() {
     });
 
     test(
-        'aucun écran n\'utilise encore le Rewarded (aucune UI, aucun '
-        'Rewarded automatique, jamais dans DuaRead ni Grave Visit)', () {
+        'aucun écran n\'appelle directement le Rewarded (LOT 5.G.B : '
+        'uniquement via AdFreeHourEntry / ShareAsImageFlow ; jamais dans '
+        'DuaRead ni Grave Visit ; aucun Rewarded automatique)', () {
       const screens = [
         'lib/home_screen.dart',
         'lib/search_screen.dart',

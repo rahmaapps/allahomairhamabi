@@ -13,6 +13,8 @@ import 'models/dua.dart';
 import 'monetization/ad_surface.dart';
 import 'monetization/interstitial_ad_controller.dart';
 import 'monetization/interstitial_trigger.dart';
+import 'monetization/rewarded_wording.dart';
+import 'monetization/share_as_image_flow.dart';
 import 'review/review_prompt_controller.dart';
 import 'review/review_trigger.dart';
 import 'user_prefs.dart';
@@ -24,6 +26,8 @@ import 'screens/grave_visit_read_screen.dart';
 import 'premium_templates.dart';
 import 'widgets/banner_ad_slot.dart';
 import 'widgets/premium_export_card.dart';
+import 'widgets/app_snackbar.dart';
+import 'widgets/rewarded_confirmation_sheet.dart';
 import 'dua_personalizer.dart';
 import 'theme/app_colors.dart';
 import 'theme/app_radii.dart';
@@ -375,24 +379,24 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
-  /// Retourne `true` si l'image a été générée et remise au mécanisme de
-  /// partage natif avec succès, `false` sinon — plus jamais un échec
-  /// silencieux (§4 Partage Premium : « ne plus échouer silencieusement »,
-  /// voir l'état échec dans `_openTemplatePicker`). La génération (rendu
-  /// PNG) et le partage lui-même peuvent chacun échouer ; les deux sont
-  /// couverts ici.
-  Future<bool> _sharePremiumImage() async {
-    final png = await _renderPremiumPng();
-    if (png == null) return false;
+  /// LOT 5.G.B — porte Rewarded du Partage comme image (B2/B3/B4), sans
+  /// aucune logique publicitaire dans cet écran : tout est dans
+  /// [ShareAsImageFlow]. Le partage TEXTE (`_shareDuaText`) n'est jamais
+  /// concerné.
+  final ShareAsImageFlow _shareAsImageFlow = ShareAsImageFlow();
 
+  /// Remise effective de l'image au système de partage natif. Toute
+  /// exception remonte à [ShareAsImageFlow], qui restitue alors
+  /// l'autorisation éventuellement consommée — plus jamais un échec
+  /// silencieux (§4 Partage Premium).
+  Future<void> _invokeImageShare(Uint8List png) async {
     try {
       await Share.shareXFiles([
         XFile.fromData(png, name: 'dua_premium.png', mimeType: 'image/png'),
       ]);
-      return true;
     } catch (e, st) {
       debugPrint('Erreur partage Premium: $e\n$st');
-      return false;
+      rethrow;
     }
   }
 
@@ -433,6 +437,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         // `setSheetState` et réinitialiserait ces variables sinon.
         bool busy = false;
         bool showPreparingLabel = false;
+        // LOT 5.G.B — Rewarded en chargement/présentation (B6).
+        bool loadingAd = false;
         String? errorMessage;
         Timer? prepTimer;
 
@@ -457,30 +463,64 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               setSheetState(() {
                 busy = true;
                 showPreparingLabel = false;
+                loadingAd = false;
                 errorMessage = null;
               });
 
               // « جارٍ التحضير… » affiché seulement au-delà de 400 ms
-              // (§4) — jamais pour un rendu quasi instantané.
-              prepTimer = Timer(const Duration(milliseconds: 400), () {
-                if (sheetContext.mounted) {
-                  setSheetState(() => showPreparingLabel = true);
-                }
-              });
+              // (§4) — jamais pour un rendu quasi instantané. Démarré
+              // uniquement à la phase de rendu : jamais pendant la
+              // confirmation ni pendant l'annonce.
+              void startPrepTimer() {
+                prepTimer?.cancel();
+                prepTimer = Timer(const Duration(milliseconds: 400), () {
+                  if (sheetContext.mounted) {
+                    setSheetState(() => showPreparingLabel = true);
+                  }
+                });
+              }
 
-              final success = await _sharePremiumImage();
+              final result = await _shareAsImageFlow.run(
+                confirm: () => showRewardedConfirmation(sheetContext),
+                render: _renderPremiumPng,
+                share: _invokeImageShare,
+                onRewardEarned: () {
+                  if (sheetContext.mounted) {
+                    showAppToast(sheetContext, RewardedWording.shareAsImageEarned);
+                  }
+                },
+                onPhase: (phase) {
+                  if (!sheetContext.mounted) return;
+                  setSheetState(
+                    () => loadingAd = phase == ShareAsImagePhase.loadingAd,
+                  );
+                  if (phase == ShareAsImagePhase.preparingImage) {
+                    startPrepTimer();
+                  }
+                },
+              );
               prepTimer?.cancel();
 
               if (!sheetContext.mounted) return;
 
-              if (success) {
-                Navigator.pop(sheetContext);
-              } else {
-                setSheetState(() {
-                  busy = false;
-                  showPreparingLabel = false;
-                  errorMessage = 'تعذّر تحضير الصورة، حاول مرة أخرى';
-                });
+              switch (result) {
+                case ShareAsImageResult.shared:
+                  Navigator.pop(sheetContext);
+                case ShareAsImageResult.cancelled:
+                  // Choix de l'utilisateur : feuille intacte, aucun message.
+                  setSheetState(() {
+                    busy = false;
+                    showPreparingLabel = false;
+                    loadingAd = false;
+                  });
+                case ShareAsImageResult.renderFailed:
+                case ShareAsImageResult.shareFailed:
+                  setSheetState(() {
+                    busy = false;
+                    showPreparingLabel = false;
+                    loadingAd = false;
+                    errorMessage = 'تعذّر تحضير الصورة، حاول مرة أخرى';
+                  });
               }
             }
 
@@ -576,8 +616,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     width: double.infinity,
                     child: AppButton(
                       role: AppButtonRole.primary,
-                      icon: showPreparingLabel ? null : Icons.ios_share,
-                      label: showPreparingLabel ? 'جارٍ التحضير…' : 'مشاركة كصورة',
+                      icon: (showPreparingLabel || loadingAd)
+                          ? null
+                          : Icons.ios_share,
+                      label: loadingAd
+                          ? RewardedWording.loading
+                          : showPreparingLabel
+                              ? 'جارٍ التحضير…'
+                              : 'مشاركة كصورة',
                       onPressed: busy ? null : handleSharePressed,
                     ),
                   ),

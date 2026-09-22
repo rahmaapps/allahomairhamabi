@@ -24,6 +24,14 @@ enum RewardOutcome {
 /// interface, jamais de Google Mobile Ads (implémentation réelle :
 /// `RewardedAdController`, LOT 5.G.A).
 abstract class RewardService {
+  /// `true` si une tentative de Rewarded est possible ici et maintenant
+  /// (consentement exploitable, unité configurée, aucune fenêtre sans
+  /// publicité active). Aucune requête réseau. Ne lève jamais.
+  ///
+  /// Permet à l'interface de ne jamais proposer un Rewarded qui ne peut pas
+  /// avoir lieu — et donc de laisser le partage gratuit sans détour (B2).
+  Future<bool> canOfferReward();
+
   /// Présente un Rewarded pour [kind] et en retourne l'issue détaillée.
   ///
   /// L'effet de la récompense est appliqué par le service lui-même, à
@@ -45,6 +53,9 @@ abstract class RewardService {
 /// qui ne doit pas exposer de Rewarded réel.
 class NoopRewardService implements RewardService {
   const NoopRewardService();
+
+  @override
+  Future<bool> canOfferReward() async => false;
 
   @override
   Future<RewardOutcome> requestRewardOutcome(RewardKind kind) async =>

@@ -27,6 +27,7 @@ void main() {
     test('ne grant jamais de récompense, quel que soit le RewardKind',
         () async {
       const service = NoopRewardService();
+      expect(await service.canOfferReward(), isFalse);
 
       for (final kind in RewardKind.values) {
         expect(await service.requestReward(kind), isFalse);

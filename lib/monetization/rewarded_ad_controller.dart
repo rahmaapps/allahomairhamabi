@@ -33,8 +33,9 @@ enum RewardedAdState { idle, loading, ready, showing }
 ///   présentation, délai dépassé : aucune récompense ;
 /// - ne lève jamais, ne bloque jamais la navigation.
 ///
-/// Aucun point d'appel UI n'existe encore : le branchement relève d'un lot
-/// UX ultérieur.
+/// Consommé par l'interface uniquement via `AdFreeHourEntry` (Paramètres)
+/// et `ShareAsImageFlow` (feuille de partage image de HOME) — LOT 5.G.B.
+/// Aucun écran ne l'appelle directement.
 class RewardedAdController implements RewardService {
   RewardedAdController({
     required AdsAvailability adsAvailability,
@@ -139,6 +140,16 @@ class RewardedAdController implements RewardService {
   // ==========================================================
   // RewardService
   // ==========================================================
+
+  @override
+  Future<bool> canOfferReward() async {
+    if (_busy) return false;
+    try {
+      return await _canAttempt();
+    } catch (_) {
+      return false;
+    }
+  }
 
   @override
   Future<bool> requestReward(RewardKind kind) async =>
