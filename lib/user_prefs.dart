@@ -69,6 +69,11 @@ class UserPrefs {
   // interstitiels, pas fenêtre « sans publicité » accordée par un Rewarded.
   static const _kLastInterstitialShownAt = 'last_interstitial_shown_at';
 
+  // Monétisation — autorisation one-shot de Partage comme image gagnée par
+  // un Rewarded (LOT 5.G.A). État présent/absent, jamais un compteur :
+  // 1 Rewarded = 1 partage (B4).
+  static const _kShareAsImageUnlockPending = 'share_as_image_unlock_pending';
+
   // Évaluation de l'application (LOT 5.D) — date du tout premier usage,
   // écrite UNE SEULE FOIS. Concept distinct de `settings_completed` (fin
   // d'onboarding, progression fonctionnelle) : mesure uniquement
@@ -270,6 +275,26 @@ class UserPrefs {
       await sp.remove(_kAdsSuppressedUntil);
     } else {
       await sp.setInt(_kAdsSuppressedUntil, until.millisecondsSinceEpoch);
+    }
+  }
+
+  // ============================================================
+  // 🎁 MONÉTISATION — autorisation de Partage comme image (LOT 5.G.A)
+  // ============================================================
+  /// `true` si une autorisation gagnée par Rewarded n'a pas encore été
+  /// consommée. Persistée entre les sessions.
+  Future<bool> getShareAsImageUnlockPending() async {
+    final sp = await _prefs();
+    return sp.getBool(_kShareAsImageUnlockPending) ?? false;
+  }
+
+  /// `false` retire la clé (aucune autorisation en attente).
+  Future<void> setShareAsImageUnlockPending(bool pending) async {
+    final sp = await _prefs();
+    if (pending) {
+      await sp.setBool(_kShareAsImageUnlockPending, true);
+    } else {
+      await sp.remove(_kShareAsImageUnlockPending);
     }
   }
 

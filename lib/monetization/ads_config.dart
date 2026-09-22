@@ -75,6 +75,11 @@ class AdsConfig {
   static const String testIosInterstitialAdUnitId =
       'ca-app-pub-3940256099942544/4411468910';
 
+  static const String testAndroidRewardedAdUnitId =
+      'ca-app-pub-3940256099942544/5224354917';
+  static const String testIosRewardedAdUnitId =
+      'ca-app-pub-3940256099942544/1712485313';
+
   /// Préfixe éditeur des identifiants de démonstration Google. Sert aux
   /// contrôles : un identifiant de production ne doit JAMAIS le porter.
   static const String googleDemoPublisherPrefix = 'ca-app-pub-3940256099942544';
@@ -103,15 +108,28 @@ class AdsConfig {
   static const String productionInterstitialAdUnitId =
       'ca-app-pub-2998944710358464/7219490327';
 
+  /// Rewarded (LOT 5.G.A) — unité **non encore créée** dans AdMob :
+  /// placeholder explicite, aucun identifiant inventé. Suivi séparément de
+  /// [hasProductionIds] : son absence ne doit pas bloquer la mise en
+  /// production des bannières et interstitiels déjà raccordés. Tant qu'il
+  /// reste un placeholder, [isRewardedAdUnitConfigured] est faux en
+  /// production et aucune requête Rewarded n'est émise.
+  static const String productionRewardedAdUnitId =
+      'PLACEHOLDER_PRODUCTION_REWARDED_AD_UNIT_ID';
+
   static bool isProductionPlaceholder(String value) =>
       value.startsWith(productionPlaceholderPrefix);
 
-  /// `true` seulement quand les trois identifiants de production ont été
-  /// réellement renseignés.
+  /// `true` seulement quand les trois identifiants de production raccordés
+  /// au LOT 5.F (App ID, Banner, Interstitial) ont été réellement
+  /// renseignés. Le Rewarded est suivi par [hasProductionRewardedId].
   static bool get hasProductionIds =>
       !isProductionPlaceholder(productionAppId) &&
       !isProductionPlaceholder(productionBannerAdUnitId) &&
       !isProductionPlaceholder(productionInterstitialAdUnitId);
+
+  static bool get hasProductionRewardedId =>
+      !isProductionPlaceholder(productionRewardedAdUnitId);
 
   // ==========================================================
   // Accesseurs neutres — SEULS points d'entrée pour les loaders
@@ -140,6 +158,18 @@ class AdsConfig {
     if (Platform.isIOS) return testIosInterstitialAdUnitId;
     return testAndroidInterstitialAdUnitId;
   }
+
+  /// Ad Unit ID Rewarded effectif — même règle que [bannerAdUnitId].
+  static String get rewardedAdUnitId {
+    if (isProduction) return productionRewardedAdUnitId;
+    if (Platform.isIOS) return testIosRewardedAdUnitId;
+    return testAndroidRewardedAdUnitId;
+  }
+
+  /// `false` uniquement en production tant que l'unité Rewarded n'est pas
+  /// renseignée : aucune requête ne doit alors partir avec un placeholder.
+  static bool get isRewardedAdUnitConfigured =>
+      !isProductionPlaceholder(rewardedAdUnitId);
 
   // ==========================================================
   // Appareils de test

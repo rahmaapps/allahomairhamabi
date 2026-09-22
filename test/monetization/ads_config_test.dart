@@ -146,6 +146,46 @@ void main() {
           startsWith('$publisher/'));
     });
 
+    test('Rewarded : ID de démonstration Google en environnement TEST', () {
+      expect(
+        AdsConfig.rewardedAdUnitId,
+        anyOf(
+          AdsConfig.testAndroidRewardedAdUnitId,
+          AdsConfig.testIosRewardedAdUnitId,
+        ),
+      );
+      expect(
+        AdsConfig.testAndroidRewardedAdUnitId,
+        startsWith(AdsConfig.googleDemoPublisherPrefix),
+      );
+      expect(AdsConfig.isRewardedAdUnitConfigured, isTrue);
+    });
+
+    test(
+        'Rewarded production : jamais un ID de test, jamais inventé ; tant '
+        'que placeholder, suivi à part sans bloquer Banner/Interstitial', () {
+      final id = AdsConfig.productionRewardedAdUnitId;
+
+      expect(id, isNot(AdsConfig.testAndroidRewardedAdUnitId));
+      expect(id, isNot(AdsConfig.testIosRewardedAdUnitId));
+      expect(
+        AdsConfig.isProductionPlaceholder(id) ||
+            !id.startsWith(AdsConfig.googleDemoPublisherPrefix),
+        isTrue,
+      );
+      // L'absence de l'unité Rewarded ne dégrade pas les IDs déjà raccordés.
+      expect(AdsConfig.hasProductionIds, isTrue);
+      expect(
+        AdsConfig.hasProductionRewardedId,
+        !AdsConfig.isProductionPlaceholder(id),
+      );
+      // Une fois renseignée, elle doit venir du même compte que l'App ID.
+      if (AdsConfig.hasProductionRewardedId) {
+        final publisher = AdsConfig.productionAppId.split('~').first;
+        expect(id, startsWith('$publisher/'));
+      }
+    });
+
     test('Banner et Interstitial sont deux unités distinctes', () {
       expect(
         AdsConfig.productionBannerAdUnitId,
@@ -190,6 +230,14 @@ void main() {
       expect(
         properties['production.interstitialAdUnitId'],
         AdsConfig.productionInterstitialAdUnitId,
+      );
+      expect(
+        properties['test.rewardedAdUnitId'],
+        AdsConfig.testAndroidRewardedAdUnitId,
+      );
+      expect(
+        properties['production.rewardedAdUnitId'],
+        AdsConfig.productionRewardedAdUnitId,
       );
     });
 

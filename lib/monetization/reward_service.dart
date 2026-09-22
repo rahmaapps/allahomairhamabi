@@ -1,24 +1,54 @@
 import 'reward_kind.dart';
 
-/// Abstraction d'un Rewarded. LOT 5.A ne fournit AUCUNE implémentation
-/// réelle : aucun `RewardedAd` Google Mobile Ads n'est chargé ni affiché ici
-/// (§12 audit LOT 5.A). Un futur lot (5.C/5.D) fournira une implémentation
-/// concrète appelant le SDK et déclenchant réellement `onUserEarnedReward`.
+/// Issue d'une demande de Rewarded. Les quatre cas sont volontairement
+/// distincts : le futur flux UX (LOT 5.G.B) doit pouvoir réagir
+/// différemment à une indisponibilité (repli) et à une fermeture volontaire.
+enum RewardOutcome {
+  /// Aucune tentative n'a eu lieu : consentement non exploitable, SDK non
+  /// initialisé, fenêtre sans publicité active, unité non configurée, ou
+  /// une autre demande est déjà en cours. Aucune requête réseau émise.
+  unavailable,
+
+  /// Tentative échouée : échec de chargement, délai dépassé ou échec de
+  /// présentation.
+  failed,
+
+  /// Annonce présentée puis fermée **sans** `onUserEarnedReward`.
+  dismissedWithoutReward,
+
+  /// `onUserEarnedReward` reçu : l'effet du [RewardKind] a été appliqué.
+  earned,
+}
+
+/// Abstraction d'un Rewarded. Les écrans ne dépendent que de cette
+/// interface, jamais de Google Mobile Ads (implémentation réelle :
+/// `RewardedAdController`, LOT 5.G.A).
 abstract class RewardService {
-  /// Doit retourner `true` UNIQUEMENT si la récompense a été effectivement
-  /// accordée par le SDK (callback `onUserEarnedReward` réellement
-  /// déclenché) — jamais sur une simple fermeture/complétion de l'annonce
-  /// sans récompense gagnée (règle produit verrouillée : "aucun reward si
-  /// la récompense n'est pas effectivement accordée").
+  /// Présente un Rewarded pour [kind] et en retourne l'issue détaillée.
+  ///
+  /// L'effet de la récompense est appliqué par le service lui-même, à
+  /// l'instant exact du callback `onUserEarnedReward` — jamais au
+  /// chargement, au début de la présentation ni à la fermeture. Aucun
+  /// autre callback n'accorde de récompense.
+  Future<RewardOutcome> requestRewardOutcome(RewardKind kind);
+
+  /// `true` UNIQUEMENT si la récompense a été effectivement accordée
+  /// (callback `onUserEarnedReward` réellement déclenché) — jamais sur une
+  /// simple fermeture de l'annonce sans récompense gagnée (règle produit
+  /// verrouillée : « aucun reward si la récompense n'est pas effectivement
+  /// accordée »).
   Future<bool> requestReward(RewardKind kind);
 }
 
-/// Implémentation par défaut tant qu'aucun Rewarded réel n'existe : ne
-/// déclenche jamais de publicité et n'accorde jamais de récompense. Sert de
-/// valeur d'injection par défaut pour ne jamais risquer un appel accidentel
-/// à une pub réelle avant le lot qui l'implémente.
+/// Implémentation neutre : ne déclenche jamais de publicité et n'accorde
+/// jamais de récompense. Reste la valeur d'injection sûre pour tout code
+/// qui ne doit pas exposer de Rewarded réel.
 class NoopRewardService implements RewardService {
   const NoopRewardService();
+
+  @override
+  Future<RewardOutcome> requestRewardOutcome(RewardKind kind) async =>
+      RewardOutcome.unavailable;
 
   @override
   Future<bool> requestReward(RewardKind kind) async => false;

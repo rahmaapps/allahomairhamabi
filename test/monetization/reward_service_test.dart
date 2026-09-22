@@ -6,19 +6,34 @@ void main() {
   group('RewardKind', () {
     test('expose exactement les deux usages verrouillés produit', () {
       expect(RewardKind.values, [
-        RewardKind.temporaryAdRemoval,
+        RewardKind.adFreeHour,
         RewardKind.shareAsImageUnlock,
       ]);
     });
   });
 
-  group('NoopRewardService (audit LOT 5.A §12 : aucun Rewarded réel)', () {
+  group('RewardOutcome', () {
+    test('distingue les quatre issues verrouillées', () {
+      expect(RewardOutcome.values, [
+        RewardOutcome.unavailable,
+        RewardOutcome.failed,
+        RewardOutcome.dismissedWithoutReward,
+        RewardOutcome.earned,
+      ]);
+    });
+  });
+
+  group('NoopRewardService (aucun Rewarded réel)', () {
     test('ne grant jamais de récompense, quel que soit le RewardKind',
         () async {
       const service = NoopRewardService();
 
       for (final kind in RewardKind.values) {
         expect(await service.requestReward(kind), isFalse);
+        expect(
+          await service.requestRewardOutcome(kind),
+          RewardOutcome.unavailable,
+        );
       }
     });
 
