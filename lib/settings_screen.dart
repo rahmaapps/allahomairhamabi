@@ -410,8 +410,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           const _RowDivider(),
                           _SettingsLinkRow(label: 'عن التطبيق', onTap: _openAbout),
                           // LOT 5.G.B — B1 : exactement entre « عن التطبيق »
-                          // et « خيارات الخصوصية ». Porte elle-même son
-                          // séparateur : absente, elle ne laisse aucune trace.
+                          // et « خيارات الخصوصية ». Toujours visible ; porte
+                          // elle-même son séparateur.
                           AdFreeHourSettingsRow(entry: _adFreeHour),
                           // LOT 5.E — présente UNIQUEMENT quand Google
                           // exige un point d'entrée « Options de
@@ -617,9 +617,8 @@ class _ThemeRow extends StatelessWidget {
 /// déjà documentée dans ce projet. Réutilise strictement `_SettingsLinkRow`
 /// et `_RowDivider` — aucun nouveau style.
 ///
+/// - TOUJOURS visible (B1), y compris quand le Rewarded est indisponible.
 /// - Heure active : jamais masquée ni désactivée (B5), temps restant réel.
-/// - Hors fenêtre : présente seulement si un Rewarded peut réellement être
-///   proposé ; absente sinon, séparateur compris.
 /// - Tap : confirmation → Rewarded → toast de succès (B6). Un échec ou une
 ///   fermeture anticipée ramène simplement à l'invitation, sans message.
 class AdFreeHourSettingsRow extends StatefulWidget {
@@ -687,7 +686,6 @@ class _AdFreeHourSettingsRowState extends State<AdFreeHourSettingsRow> {
   @override
   Widget build(BuildContext context) {
     final entry = widget.entry;
-    if (!entry.isVisible) return const SizedBox.shrink();
 
     return Column(
       mainAxisSize: MainAxisSize.min,

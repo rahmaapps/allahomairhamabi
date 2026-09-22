@@ -42,7 +42,6 @@ void main() {
     await entry.refresh();
 
     expect(entry.state, AdFreeHourEntryState.idle);
-    expect(entry.isVisible, isTrue);
     expect(entry.label, RewardedWording.invitation);
     entry.dispose();
   });
@@ -155,12 +154,10 @@ void main() {
     await UserPrefs.instance.setAdsSuppressedUntil(
       clock.now.add(const Duration(minutes: 42, seconds: 17)),
     );
-    // Même si le Rewarded est indisponible, la ligne reste visible.
     final entry = build(FakeRewardService(offerable: false));
     await entry.refresh();
 
     expect(entry.state, AdFreeHourEntryState.active);
-    expect(entry.isVisible, isTrue);
     expect(entry.label, 'لا إعلانات لمدة ساعة — متبقٍ 42:17');
 
     clock.now = clock.now.add(const Duration(seconds: 18));
@@ -182,15 +179,38 @@ void main() {
 
     expect(entry.state, AdFreeHourEntryState.idle);
     expect(entry.label, RewardedWording.invitation);
-    expect(entry.isVisible, isTrue);
     entry.dispose();
   });
 
-  test('Rewarded non proposable hors fenêtre → ligne absente', () async {
-    final entry = build(FakeRewardService(offerable: false));
+  test(
+      'Rewarded indisponible → invitation affichée, aucune sollicitation '
+      'automatique du service Rewarded', () async {
+    final service = FakeRewardService(offerable: false);
+    final entry = build(service);
     await entry.refresh();
 
-    expect(entry.isVisible, isFalse);
+    expect(entry.state, AdFreeHourEntryState.idle);
+    expect(entry.label, RewardedWording.invitation);
+    expect(service.requestedKinds, isEmpty);
+    expect(service.canOfferCallCount, 0);
+    entry.dispose();
+  });
+
+  test(
+      'Rewarded indisponible au tap → retour à l\'invitation, sans crash ni '
+      'récompense', () async {
+    final service = FakeRewardService(
+      offerable: false,
+      outcome: RewardOutcome.unavailable,
+    );
+    final entry = build(service);
+
+    final result = await entry.activate(confirm: () async => true);
+
+    expect(result, AdFreeHourResult.notEarned);
+    expect(entry.state, AdFreeHourEntryState.idle);
+    expect(entry.label, RewardedWording.invitation);
+    expect(await UserPrefs.instance.getAdsSuppressedUntil(), isNull);
     entry.dispose();
   });
 

@@ -131,20 +131,53 @@ void main() {
     await _tearDown(tester, entry);
   });
 
-  testWidgets('Rewarded non proposable → ligne absente, séparateur compris',
-      (tester) async {
-    final entry =
-        AdFreeHourEntry(rewardService: FakeRewardService(offerable: false));
+  for (final offerable in [false, true]) {
+    testWidgets(
+        'ligne TOUJOURS visible — Rewarded '
+        '${offerable ? 'disponible' : 'indisponible'} — sans Rewarded '
+        'automatique', (tester) async {
+      final service = FakeRewardService(offerable: offerable);
+      final entry = AdFreeHourEntry(rewardService: service);
+      await _pumpRow(tester, entry);
+      await tester.pump(const Duration(seconds: 2));
+
+      expect(find.text(RewardedWording.invitation), findsOneWidget);
+      // Séparateur toujours présent avec la ligne.
+      expect(
+        find.descendant(
+          of: find.byType(AdFreeHourSettingsRow),
+          matching: find.byType(Container),
+        ),
+        findsWidgets,
+      );
+      // Afficher la ligne ne déclenche jamais de Rewarded.
+      expect(service.requestedKinds, isEmpty);
+      await _tearDown(tester, entry);
+    });
+  }
+
+  testWidgets(
+      'Rewarded indisponible au tap : ligne toujours visible, aucun message '
+      'technique, aucune nouvelle tentative', (tester) async {
+    final service = FakeRewardService(
+      offerable: false,
+      outcome: RewardOutcome.unavailable,
+    );
+    final entry = AdFreeHourEntry(rewardService: service);
     await _pumpRow(tester, entry);
 
-    expect(find.text(RewardedWording.invitation), findsNothing);
-    expect(
-      find.descendant(
-        of: find.byType(AdFreeHourSettingsRow),
-        matching: find.byType(Container),
-      ),
-      findsNothing,
-    );
+    await tester.tap(find.text(RewardedWording.invitation));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(RewardedWording.confirmAction));
+    await tester.pumpAndSettle();
+
+    expect(service.requestedKinds, [RewardKind.adFreeHour]);
+    expect(find.text(RewardedWording.invitation), findsOneWidget);
+    expect(find.text(RewardedWording.adFreeHourEarned), findsNothing);
+    expect(find.byType(SnackBar), findsNothing);
+
+    await tester.pump(const Duration(seconds: 3));
+    expect(service.requestedKinds, hasLength(1));
     await _tearDown(tester, entry);
   });
 }

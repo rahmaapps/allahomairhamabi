@@ -65,7 +65,6 @@ class AdFreeHourEntry extends ChangeNotifier {
   final Duration _tickInterval;
 
   DateTime? _suppressedUntil;
-  bool _offerable = false;
   bool _loading = false;
   bool _disposed = false;
   Timer? _ticker;
@@ -80,13 +79,6 @@ class AdFreeHourEntry extends ChangeNotifier {
 
   /// Temps restant réel, ou `null` hors fenêtre active.
   Duration? get remaining => _status.remaining(now: _clock());
-
-  /// La ligne n'est jamais masquée ni désactivée pendant une heure active
-  /// (B5). Hors fenêtre, elle n'apparaît que si un Rewarded peut réellement
-  /// être proposé — même principe que « خيارات الخصوصية » : jamais une
-  /// ligne qui ne peut pas fonctionner.
-  bool get isVisible =>
-      state != AdFreeHourEntryState.idle || _offerable;
 
   String get label {
     switch (state) {
@@ -111,18 +103,16 @@ class AdFreeHourEntry extends ChangeNotifier {
     return '$minutes:$seconds';
   }
 
-  /// Relit l'état réel (`adsSuppressedUntil`, disponibilité du Rewarded).
-  /// Ne lève jamais.
+  /// Relit l'état réel (`adsSuppressedUntil`). Ne lève jamais.
+  ///
+  /// La disponibilité du Rewarded n'est volontairement PAS consultée : la
+  /// ligne est toujours visible (B1). Un Rewarded indisponible se traduit
+  /// seulement, au tap, par un retour à l'invitation sans message.
   Future<void> refresh() async {
     try {
       _suppressedUntil = await _readSuppressedUntil();
     } catch (_) {
       _suppressedUntil = null;
-    }
-    try {
-      _offerable = await _rewardService.canOfferReward();
-    } catch (_) {
-      _offerable = false;
     }
     if (_disposed) return;
     _syncTicker();
@@ -176,22 +166,11 @@ class AdFreeHourEntry extends ChangeNotifier {
     } else {
       _ticker?.cancel();
       _ticker = null;
-      // Expiration constatée : l'invitation n'est proposée que si un
-      // Rewarded est réellement possible — relu une seule fois.
+      // Expiration constatée : retour à l'invitation.
       if (_suppressedUntil != null && !_status.isActive(now: _clock())) {
         _suppressedUntil = null;
-        unawaited(_refreshOfferable());
       }
     }
-  }
-
-  Future<void> _refreshOfferable() async {
-    try {
-      _offerable = await _rewardService.canOfferReward();
-    } catch (_) {
-      _offerable = false;
-    }
-    if (!_disposed) notifyListeners();
   }
 
   @override
