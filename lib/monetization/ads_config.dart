@@ -108,14 +108,14 @@ class AdsConfig {
   static const String productionInterstitialAdUnitId =
       'ca-app-pub-2998944710358464/7219490327';
 
-  /// Rewarded (LOT 5.G.A) — unité **non encore créée** dans AdMob :
-  /// placeholder explicite, aucun identifiant inventé. Suivi séparément de
-  /// [hasProductionIds] : son absence ne doit pas bloquer la mise en
-  /// production des bannières et interstitiels déjà raccordés. Tant qu'il
-  /// reste un placeholder, [isRewardedAdUnitConfigured] est faux en
-  /// production et aucune requête Rewarded n'est émise.
+  /// Rewarded (LOT 5.G.A, raccordé au LOT 5.G.C) — unité réelle de
+  /// l'éditeur. Miroir strict de `android/ads_ids.properties`. Suivi
+  /// séparément de [hasProductionIds] : s'il redevenait un placeholder,
+  /// [isRewardedAdUnitConfigured] serait faux en production et aucune
+  /// requête Rewarded ne serait émise, sans bloquer bannières et
+  /// interstitiels.
   static const String productionRewardedAdUnitId =
-      'PLACEHOLDER_PRODUCTION_REWARDED_AD_UNIT_ID';
+      'ca-app-pub-2998944710358464/7965966915';
 
   static bool isProductionPlaceholder(String value) =>
       value.startsWith(productionPlaceholderPrefix);

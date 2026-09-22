@@ -186,6 +186,56 @@ void main() {
       }
     });
 
+    test(
+        'LOT 5.G.C — valeurs attendues : TEST démo Google, PRODUCTION réelle, '
+        'aucun placeholder, Banner/Interstitial inchangés', () {
+      final properties = _readProperties('android/ads_ids.properties');
+
+      // A. TEST → IDs de démonstration Google, inchangés.
+      expect(AdsConfig.environment, AdsEnvironment.test);
+      expect(
+        AdsConfig.testAndroidRewardedAdUnitId,
+        'ca-app-pub-3940256099942544/5224354917',
+      );
+      expect(AdsConfig.rewardedAdUnitId, isNot(AdsConfig.productionRewardedAdUnitId));
+
+      // B. PRODUCTION → unité Rewarded réelle, identique dans les deux sources.
+      const expectedRewarded = 'ca-app-pub-2998944710358464/7965966915';
+      expect(AdsConfig.productionRewardedAdUnitId, expectedRewarded);
+      expect(properties['production.rewardedAdUnitId'], expectedRewarded);
+
+      // C. Plus aucun placeholder dans le chemin production.
+      expect(AdsConfig.hasProductionRewardedId, isTrue);
+      for (final entry in properties.entries) {
+        if (entry.key.startsWith('production.')) {
+          expect(
+            AdsConfig.isProductionPlaceholder(entry.value),
+            isFalse,
+            reason: entry.key,
+          );
+        }
+      }
+
+      // D/E. Banner et Interstitial inchangés (test et production).
+      expect(
+        AdsConfig.productionBannerAdUnitId,
+        'ca-app-pub-2998944710358464/4992782235',
+      );
+      expect(
+        AdsConfig.productionInterstitialAdUnitId,
+        'ca-app-pub-2998944710358464/7219490327',
+      );
+      expect(
+        AdsConfig.testAndroidBannerAdUnitId,
+        'ca-app-pub-3940256099942544/6300978111',
+      );
+      expect(
+        AdsConfig.testAndroidInterstitialAdUnitId,
+        'ca-app-pub-3940256099942544/1033173712',
+      );
+      expect(AdsConfig.productionAppId, 'ca-app-pub-2998944710358464~3134659675');
+    });
+
     test('Banner et Interstitial sont deux unités distinctes', () {
       expect(
         AdsConfig.productionBannerAdUnitId,
