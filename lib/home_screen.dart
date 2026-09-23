@@ -1250,6 +1250,22 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     // déjà utilisés par AppBarTheme lui-même (LOT 1A).
     final appBarForeground = isDark ? AppColorsDark.textPrimary : AppColorsLight.onPrimary;
 
+    // Inset bas système, capturé ICI (avant que `Scaffold` ne l'efface) :
+    // dès qu'un `bottomNavigationBar` est fourni, `Scaffold` retire
+    // inconditionnellement le padding bas de `MediaQuery` transmis au
+    // `body` — quelle que soit la hauteur RÉELLEMENT rendue par ce
+    // `bottomNavigationBar` (mécanique interne de `Scaffold`, indépendante
+    // de `BannerAdSlot`). Or `BannerAdSlot` (§ LOT 5.B) rend une hauteur
+    // NULLE tant qu'aucune annonce n'est chargée — un état courant, pas un
+    // cas limite. Le `SafeArea` du `body` ci-dessous ne voit alors plus
+    // aucun inset à respecter et le pied de carte (♡ + نسخ/مشاركة) se
+    // retrouve peint au ras du bord physique, sous la barre de navigation
+    // Android (edge-to-edge, constaté sur appareil réel). Même classe de
+    // correctif que `MediaQuery.viewPaddingOf` déjà utilisé pour les
+    // feuilles modales de cet écran (`_openTemplatePicker`,
+    // `_openGraveVisitPersonPicker`) face à la même mécanique `Scaffold`.
+    final bottomSystemInset = MediaQuery.paddingOf(context).bottom;
+
     // Rail paysage (LOT HOME LANDSCAPE — décision UX validée) : en paysage,
     // les chips catégories et la ligne « pour qui » quittent la colonne
     // verticale pour un rail latéral gauche de 108dp, à côté de la carte au
@@ -1402,11 +1418,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ),
             body: SafeArea(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(
+                padding: EdgeInsets.fromLTRB(
                   AppSpacing.xl,
                   AppSpacing.lg,
                   AppSpacing.xl,
-                  AppSpacing.lg,
+                  AppSpacing.lg + bottomSystemInset,
                 ),
                 child: bodyContent,
               ),
