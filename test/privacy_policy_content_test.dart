@@ -5,6 +5,9 @@
 // qu'avant) : les deux langues doivent rester équivalentes et couvrir ce que
 // le code fait réellement — bannières, interstitiels, annonces avec
 // récompense, consentement UMP, identifiant publicitaire.
+//
+// LOT 68-B.0.1 : le site public vit dans `site/` (seul dossier publié par
+// GitHub Pages) ; les URL publiques sont inchangées.
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -18,8 +21,8 @@ String _read(String path) => File(path)
     .replaceAll(RegExp(r'\s+'), ' ');
 
 void main() {
-  final ar = _read('privacy_ar.html');
-  final fr = _read('privacy_fr.html');
+  final ar = _read('site/privacy_ar.html');
+  final fr = _read('site/privacy_fr.html');
 
   group('Politiques AR / FR — équivalence', () {
     test('les deux versions existent et ont les mêmes sections', () {
@@ -129,7 +132,7 @@ void main() {
     });
 
     test('la page d\'accueil du site lie toujours la politique', () {
-      expect(_read('index.html'), contains('href="privacy_ar.html"'));
+      expect(_read('site/index.html'), contains('href="privacy_ar.html"'));
     });
 
     test('l\'entrée « خيارات الخصوصية » reste branchée dans les Paramètres',
