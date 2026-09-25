@@ -1,0 +1,49 @@
+# LOT 68-B.0.1 — Publication GitHub Pages du site public uniquement.
+#
+# Seul le dossier `site/` est publié (tel quel, sans Jekyll ni build) :
+# le code Flutter, `docs/` et le reste du repository ne sont jamais servis.
+# URL inchangée : https://rahmaapps.github.io/allahomairhamabi/
+#
+# Pré-requis manuel : Settings → Pages → Build and deployment → Source =
+# « GitHub Actions » (voir docs/LOT68_B01_MIGRATION_SITE.md).
+name: Deploy site to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - ".github/workflows/deploy-site.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Un seul déploiement à la fois ; un déploiement en cours n'est pas annulé.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v6
+
+      - name: Upload site/ only
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
