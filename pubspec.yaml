@@ -75,10 +75,7 @@ flutter_native_splash:
     image: assets/splash/splash_icon.png
     image_dark: assets/splash/splash_icon.png
 
-flutter_launcher_icons:
-  android: true
-  ios: false
-  image_path: "assets/icon/app_icon.png"
-  adaptive_icon_background: "#0E7A5B"   # même que ton fond vert
-  adaptive_icon_foreground: "assets/icon/app_icon.png"
+# Launcher icons Android : ressources P2-H gérées manuellement (adaptive
+# foreground/monochrome vectoriels + mipmaps legacy, source
+# assets/icon/app-icon-hands-light.svg). Ne pas relancer flutter_launcher_icons.
 
