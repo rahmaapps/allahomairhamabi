@@ -1,150 +1,415 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>تطبيق اللهم ارحم أبي</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>اللَّهُمَّ ارْحَمْ أَبِي – أدعية لوالدي الميت</title>
+<meta name="description" content="أدعية مختارة لوالدك ووالدتك ولكل من تحب. اختر من تدعو له، واحفظ الدعاء في المفضلة، مع تذكير صباحًا ومساءً ويوم الجمعة إن أردت. مجاني، مع إعلانات محدودة. متوفر على Android.">
+<link rel="canonical" href="https://rahmaapps.github.io/allahomairhamabi/">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="ar_AR">
+<meta property="og:site_name" content="Rahma Applications">
+<meta property="og:title" content="اللَّهُمَّ ارْحَمْ أَبِي – أدعية لوالدي الميت">
+<meta property="og:description" content="أدعية مختارة لوالدك ووالدتك ولكل من تحب. مجاني، مع إعلانات محدودة. متوفر على Android.">
+<meta property="og:url" content="https://rahmaapps.github.io/allahomairhamabi/">
+<meta property="og:image" content="https://rahmaapps.github.io/allahomairhamabi/Logo.jpg">
+<meta property="og:image:width" content="200">
+<meta property="og:image:height" content="200">
+<meta property="og:image:alt" content="أيقونة تطبيق اللهم ارحم أبي">
+<meta name="twitter:card" content="summary">
+<link rel="icon" type="image/jpeg" href="Logo.jpg">
+<link rel="apple-touch-icon" href="Logo.jpg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&amp;family=Lateef:wght@400;600;700&amp;display=swap" rel="stylesheet">
+<style>
+/* LOT 68-B.3-B — transposition statique du design B.3-A (Landing.dc.html). */
+:root{
+  --bg:#FFFBF1; --bg-alt:#FFF6E7; --green:#006A4E; --green-hover:#00573F; --green-dark:#004D38;
+  --green-soft:#E3EFE9; --gold:#D4AF37; --gold-text:#7A5C0F; --ink:#1C2B25; --text:#3D4A44;
+  --muted:#5E6B65; --line:#EDE3CC; --chip-line:#E8DCC2; --frame:#13261F;
+  --pad-x:clamp(20px,5vw,48px); --pad-y:clamp(64px,9vw,112px); --gap-split:clamp(48px,6vw,96px);
+}
+*{box-sizing:border-box}
+html{scroll-padding-top:80px}
+@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"IBM Plex Sans Arabic",sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+h1,h2,h3,p,ul,ol,figure{margin:0}
+img{max-width:100%}
+a{color:var(--green);text-decoration:none}
+a:hover{color:var(--green-dark)}
+a:focus-visible{outline:2px solid var(--green);outline-offset:3px;border-radius:4px}
 
-  <style>
-    body {
-      font-family: "Noto Kufi Arabic", sans-serif;
-      background: #063F1D;
-      color: #FCEECB;
-      margin: 0;
-      padding: 0;
-      text-align: center;
-      line-height: 1.8;
-    }
+/* 01 En-tête */
+.site-header{position:sticky;top:0;z-index:10;background:rgba(255,251,241,0.94);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.site-header__inner{max-width:1120px;margin:0 auto;height:64px;padding:0 clamp(16px,5vw,48px);display:flex;align-items:center;justify-content:space-between;gap:24px}
+.brand{display:flex;align-items:center;gap:12px;color:var(--ink)}
+.brand:hover{color:var(--ink)}
+.brand img{width:36px;height:36px;border-radius:12px;display:block}
+.brand__text{display:flex;flex-direction:column;line-height:1.1}
+.brand__name{font-family:Lateef,serif;font-size:24px;color:var(--green)}
+.brand__publisher{font-size:11px;letter-spacing:0.04em;color:var(--muted);text-align:right}
+.site-nav{display:none;gap:28px;font-size:15px}
+.site-nav a{color:var(--text)}
+.site-nav a:hover{color:var(--green-dark)}
+@media (min-width:1024px){.site-nav{display:flex}}
+.btn-header{display:flex;align-items:center;gap:8px;height:40px;padding:0 16px;border-radius:12px;background:var(--green);color:var(--bg);font-size:14px;font-weight:600;white-space:nowrap}
+.btn-header:hover{background:var(--green-hover);color:var(--bg)}
 
-    header {
-      padding: 30px 20px;
-    }
-    header img {
-      width: 120px;
-      height: auto;
-      margin-bottom: 10px;
-    }
-    h1 {
-      font-size: 32px;
-      margin: 10px 0;
-    }
-    h2 {
-      font-size: 26px;
-      margin-top: 40px;
-      margin-bottom: 15px;
-    }
-    p {
-      font-size: 18px;
-      opacity: 0.95;
-      margin: 0 15px;
-    }
+/* Sections communes */
+.section{padding:var(--pad-y) var(--pad-x)}
+.section--alt{background:var(--bg-alt)}
+.wrap{max-width:1120px;margin:0 auto}
+.split{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:var(--gap-split)}
+.split--rev{flex-direction:row-reverse}
+.copy{flex:1 1 400px;min-width:0;max-width:520px;display:flex;flex-direction:column;gap:20px}
+.rule{display:block;width:32px;height:2px;background:var(--gold);border-radius:2px}
+.h2{font-size:clamp(30px,4vw,42px);font-weight:600;line-height:1.3;color:var(--ink)}
+.h3{font-size:clamp(24px,3vw,30px);font-weight:600;line-height:1.35;color:var(--ink)}
+.lead{font-size:18px;line-height:1.9;color:var(--text);text-wrap:pretty}
+.note{font-size:15px;color:var(--muted)}
+.caption{font-size:13px;color:var(--muted)}
 
-    .play-btn {
-      display: inline-block;
-      margin-top: 20px;
-      background: #0B542E;
-      padding: 14px 28px;
-      color: white;
-      font-size: 20px;
-      border-radius: 14px;
-      text-decoration: none;
-      transition: 0.3s;
-    }
-    .play-btn:hover {
-      background: #0E7045;
-    }
+/* Cadre téléphone (captures réelles, non modifiées) */
+.shot{flex:0 1 auto;margin:0 auto;display:flex;flex-direction:column;align-items:center;gap:16px}
+.phone{width:var(--phone-w);padding:8px;border-radius:40px;background:var(--frame);box-shadow:0 32px 64px -24px rgba(0,106,78,0.35)}
+.phone img{display:block;width:100%;height:auto;border-radius:32px}
 
-    .features {
-      padding: 0 25px;
-      text-align: right;
-      max-width: 600px;
-      margin: auto;
-    }
-    .features ul {
-      list-style: none;
-      padding: 0;
-    }
-    .features li {
-      background: rgba(255,255,255,0.1);
-      margin-bottom: 12px;
-      padding: 12px;
-      border-radius: 10px;
-      font-size: 18px;
-    }
+/* 02 Hero */
+.hero{padding:clamp(48px,8vw,104px) var(--pad-x) clamp(64px,9vw,112px)}
+.hero__copy{flex:1 1 400px;min-width:0;max-width:560px;display:flex;flex-direction:column;gap:24px}
+.eyebrow{display:flex;align-items:center;gap:12px}
+.eyebrow__label{font-size:14px;font-weight:500;letter-spacing:0.06em;color:var(--gold-text)}
+.hero h1{font-family:Lateef,serif;font-weight:400;font-size:clamp(60px,11vw,128px);line-height:1.05;color:var(--green)}
+.hero__sub{font-size:clamp(20px,2.2vw,24px);line-height:1.7;color:var(--text);text-wrap:pretty}
+.hero__actions{display:flex;flex-wrap:wrap;align-items:center;gap:16px 24px;padding-top:8px}
+.btn-primary{display:flex;align-items:center;justify-content:center;gap:12px;height:56px;padding:0 28px;border-radius:16px;background:var(--green);color:var(--bg);font-size:17px;font-weight:600;box-shadow:0 12px 24px -12px rgba(0,106,78,0.55)}
+.btn-primary:hover{background:var(--green-hover);color:var(--bg)}
+.hero__platform{font-size:14px;color:var(--muted)}
+.hero .shot{position:relative}
+.hero__halo{position:absolute;top:8%;left:50%;width:132%;aspect-ratio:1;transform:translateX(-50%);border-radius:50%;background:var(--bg-alt);border:1px solid rgba(212,175,55,0.35)}
+.hero .phone{position:relative;box-shadow:0 32px 64px -24px rgba(0,106,78,0.4)}
+.hero .caption{position:relative}
 
-    .screenshots img {
-      width: 270px;
-      border-radius: 14px;
-      margin: 10px;
-      border: 2px solid rgba(255,255,255,0.15);
-    }
+/* 03 لمن تدعو؟ */
+.relations{list-style:none;padding:4px 0 0;display:flex;flex-wrap:wrap;gap:8px}
+.relations li{padding:6px 14px;border-radius:12px;border:1px solid var(--chip-line);background:var(--bg);font-size:15px;color:var(--text)}
 
-    footer {
-      margin-top: 50px;
-      padding: 25px;
-      background: rgba(255,255,255,0.05);
-      color: #EEE;
-      font-size: 14px;
-    }
-  </style>
+/* 04 كل يوم */
+.daily{display:flex;flex-direction:column;gap:var(--pad-y)}
+.steps{list-style:none;padding:0;margin:8px 0 0;display:flex;flex-direction:column;gap:16px}
+.steps li{display:flex;align-items:flex-start;gap:16px}
+.steps__n{flex:0 0 36px;height:36px;border-radius:12px;background:var(--green-soft);color:var(--green);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:16px}
+.steps__body{display:flex;flex-direction:column;gap:2px;padding-top:4px}
+.steps__t{font-size:17px;font-weight:600;color:var(--ink)}
+.steps__d{font-size:15px;line-height:1.7;color:var(--muted)}
+.daily__search{padding-top:clamp(48px,6vw,80px);border-top:1px solid var(--line)}
+.daily__search .copy{gap:16px}
+.daily__search .phone{box-shadow:0 32px 64px -24px rgba(0,106,78,0.3)}
+
+/* 06 تذكير — C6 recadrée sur « التذكير » (1080/1440 depuis le haut) avec fondu */
+.reminder__claim{font-size:22px;line-height:1.7;color:var(--green);font-weight:500;text-wrap:pretty}
+.phone--crop{padding:8px 8px 0;border-radius:40px 40px 0 0;box-shadow:0 32px 64px -32px rgba(0,106,78,0.35);-webkit-mask-image:linear-gradient(to bottom,#000 78%,transparent);mask-image:linear-gradient(to bottom,#000 78%,transparent)}
+.phone--crop .crop{aspect-ratio:1080/1440;overflow:hidden;border-radius:32px 32px 0 0}
+.phone--crop img{border-radius:0}
+
+/* 07 شارك الأجر */
+.share{display:flex;flex-direction:column;gap:clamp(40px,5vw,56px)}
+.share__intro{max-width:620px;display:flex;flex-direction:column;gap:20px}
+.gallery{display:flex;gap:clamp(16px,2.5vw,32px);overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:8px;align-items:flex-end;margin-inline:calc(-1 * var(--pad-x));padding-inline:var(--pad-x);list-style:none;margin-top:0;margin-bottom:0}
+.gallery li{flex:1 0 min(68vw,260px);scroll-snap-align:center}
+.gallery figure{display:flex;flex-direction:column;gap:16px}
+.gallery img{display:block;width:100%;height:auto;border-radius:16px;box-shadow:0 24px 48px -24px rgba(0,106,78,0.4)}
+.gallery figcaption{display:flex;flex-direction:column;gap:2px}
+.gallery__name{font-size:17px;font-weight:600;color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:16px}
+.card{padding:24px;border-radius:16px;background:var(--bg);border:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+.card h3{font-size:18px;font-weight:600;color:var(--ink)}
+.card p{font-size:16px;line-height:1.8;color:var(--text)}
+.card p.card__free{color:var(--green);font-weight:500}
+
+/* 08 بوضوح */
+.clarity{max-width:800px;margin:0 auto;padding:clamp(28px,5vw,56px);border-radius:24px;background:#FFFFFF;border:1px solid var(--line);box-shadow:0 24px 48px -32px rgba(0,106,78,0.25);display:flex;flex-direction:column;gap:24px}
+.clarity__head{display:flex;flex-direction:column;gap:12px}
+.clarity__claim{font-size:clamp(20px,2.4vw,24px);font-weight:600;color:var(--green)}
+.clarity__rule{height:1px;background:linear-gradient(to left,var(--gold),rgba(212,175,55,0))}
+.clarity ul{list-style:none;padding:0;display:flex;flex-direction:column;gap:16px}
+.clarity li{display:flex;align-items:flex-start;gap:16px;font-size:17px;line-height:1.8;color:var(--text)}
+.diamond{flex:0 0 8px;height:8px;margin-top:12px;background:var(--gold);transform:rotate(45deg)}
+
+/* 09 CTA Google Play */
+.cta{background:var(--green);padding:clamp(64px,9vw,104px) var(--pad-x)}
+.cta__inner{max-width:720px;margin:0 auto;display:flex;flex-direction:column;align-items:center;text-align:center;gap:20px}
+.cta__icon{width:72px;height:72px;border-radius:16px;border:1px solid rgba(212,175,55,0.5);display:block}
+.cta h2{font-family:Lateef,serif;font-weight:400;font-size:clamp(44px,6vw,64px);line-height:1.15;color:var(--bg)}
+.cta p{font-size:17px;line-height:1.8;color:var(--green-soft)}
+.btn-light{margin-top:8px;display:flex;align-items:center;justify-content:center;height:56px;padding:0 32px;border-radius:16px;background:var(--bg);color:var(--green);font-size:17px;font-weight:600}
+.btn-light:hover{background:var(--bg-alt);color:var(--green-dark)}
+.cta a:focus-visible{outline-color:var(--bg)}
+
+/* 10 Footer */
+.site-footer{padding:40px var(--pad-x) 48px;border-top:1px solid var(--line)}
+.site-footer__inner{max-width:1120px;margin:0 auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:20px 32px}
+.site-footer__brand{display:flex;align-items:center;gap:12px}
+.site-footer__brand img{width:28px;height:28px;border-radius:12px;display:block}
+.site-footer__brand span{font-size:14px;color:var(--text)}
+.site-footer nav{display:flex;flex-wrap:wrap;gap:12px 28px;font-size:14px}
+</style>
 </head>
-
 <body>
 
-<header>
-  <img src="Logo.jpg" alt="Logo">
-  <h1>تطبيق "اللهم ارحم أبي"</h1>
-  <p>أدعية مختارة لوالدك، مصنّفة وعشوائية، مع مشاركة سهلة وتصميم جميل.</p>
-
-  <!-- Bouton Google Play à activer après publication -->
-  <a class="play-btn" href="#">
-    تحميل التطبيق من متجر Google Play
-  </a>
+<header class="site-header">
+  <div class="site-header__inner">
+    <a class="brand" href="#top">
+      <img src="Logo.jpg" alt="" width="36" height="36">
+      <span class="brand__text">
+        <span class="brand__name">اللَّهُمَّ ارْحَمْ أَبِي</span>
+        <span class="brand__publisher" dir="ltr">Rahma Applications</span>
+      </span>
+    </a>
+    <nav class="site-nav" aria-label="أقسام الصفحة">
+      <a href="#who">لمن تدعو؟</a>
+      <a href="#daily">كل يوم</a>
+      <a href="#grave">زيارة القبر</a>
+      <a href="#share">شارك الأجر</a>
+      <a href="#clarity">بوضوح</a>
+    </nav>
+    <a class="btn-header" href="https://play.google.com/store/apps/details?id=com.joumane.allahomairhamabi" data-cta="google-play-header">Google Play</a>
+  </div>
 </header>
 
-<h2>✨ المميزات التي تجعل موقعنا خيارك الأفضل</h2>
-<div class="features">
-  <ul>
-    <li>📖 باقة متنوعة من الأدعية القصيرة والطويلة للميت لتناسب كل وقت وحالة</li>
-    <li>🕊️ أدعية مؤثرة ومختارة بعناية لوالدك رحمه الله تلامس القلب وتبعث الطمأنينة</li>
-    <li>🌙 أدعية خاصة بليلة الجمعة لاغتنام الأجر في أفضل الأوقات</li>
-    <li>🌟 أدعية مميزة لشهر رمضان المبارك تزيد حسنات والدك بإذن الله</li>
-    <li>💾 إمكانية حفظ الأدعية المفضلة للرجوع إليها بسرعة</li>
-    <li>🎲 ميزة عرض دعاء عشوائي لتجديد نيتك في كل مرة</li>
-    <li>🔔 تذكير يومي بالدعاء حتى لا تنسى من تحب</li>
-    <li>📶 يعمل بالكامل بدون إنترنت لسهولة الاستخدام في أي وقت</li>
-    <li>🎨 تصميم أنيق ومريح للعين يضمن تجربة استخدام سلسة</li>
-    <li>✅ محتوى موثوق ومنتقَى بعناية لضمان الجودة</li>
-    <li>📤 مشاركة سريعة عبر واتساب لإيصال الأجر للغير</li>
-    <li>⭐ وصول فوري وسهل إلى قائمة الأدعية المفضّلة</li>
-    <li>🔎 محرك بحث ذكي للوصول لأي دعاء خلال ثوانٍ</li>
-    <li>🌗 واجهة فاتحة وداكنة لتناسب ذوقك وراحتك البصرية</li>
-    <li>🚫 تجربة نقية 100% بدون إعلانات مزعجة</li>
-  </ul>
-</div>
+<main id="top">
 
-<h2>صور التطبيق</h2>
-<div class="screenshots">
-  <img src="mockup_home.png" alt="Home">
-  <img src="mockup_favorites.png" alt="Favorites">
-  <img src="mockup_settings.png" alt="Settings">
-</div>
+<section class="hero" aria-labelledby="h1">
+  <div class="wrap split">
+    <div class="hero__copy">
+      <div class="eyebrow">
+        <span class="rule"></span>
+        <span class="eyebrow__label" dir="ltr">Rahma Applications</span>
+      </div>
+      <h1 id="h1">اللَّهُمَّ ارْحَمْ أَبِي</h1>
+      <p class="hero__sub">أدعية مختارة لوالدك ووالدتك ولكل من تحب</p>
+      <div class="hero__actions">
+        <a class="btn-primary" href="https://play.google.com/store/apps/details?id=com.joumane.allahomairhamabi" data-cta="google-play-hero">حمّل التطبيق من Google Play</a>
+        <span class="hero__platform">متوفر على Android</span>
+      </div>
+    </div>
+    <figure class="shot">
+      <div class="hero__halo"></div>
+      <div class="phone" style="--phone-w:min(300px,74vw)">
+        <img src="images/c3-dua-read.png" alt="شاشة قراءة الدعاء في التطبيق" width="1080" height="2340">
+      </div>
+      <figcaption class="caption">لقطة حقيقية من التطبيق</figcaption>
+    </figure>
+  </div>
+</section>
 
-<h2>سياسة الخصوصية</h2>
-<p>
-  <a href="privacy_ar.html" style="color:#B8F3C2; font-size:18px;">
-    اضغط هنا لقراءة سياسة الخصوصية
-  </a>
-</p>
+<section id="who" class="section section--alt" aria-labelledby="h-who">
+  <div class="wrap split split--rev">
+    <div class="copy">
+      <span class="rule"></span>
+      <h2 id="h-who" class="h2">لمن تدعو؟</h2>
+      <p class="lead">اختر من تدعو له، واحدًا أو أكثر، وأضف اسمه إن شئت. يُحفظ اختيارك تلقائيًا على جهازك.</p>
+      <ul class="relations" aria-label="القرابات المتاحة">
+        <li>أبي</li>
+        <li>أمي</li>
+        <li>والديّ</li>
+        <li>جدي</li>
+        <li>جدتي</li>
+        <li>أخي</li>
+        <li>أختي</li>
+        <li>ابني</li>
+        <li>ابنتي</li>
+        <li>زوجي</li>
+        <li>زوجتي</li>
+      </ul>
+    </div>
+    <figure class="shot">
+      <div class="phone" style="--phone-w:min(290px,74vw)">
+        <img src="images/c2-person-selection.png" alt="شاشة اختيار الشخص الذي تدعو له" width="1080" height="2340" loading="lazy">
+      </div>
+      <figcaption class="caption">لقطة حقيقية من التطبيق — الاسم للتوضيح</figcaption>
+    </figure>
+  </div>
+</section>
 
-<footer>
-  <p>© 2026 – تطبيق اللهم ارحم أبي</p>
-  <p>تم التطوير بواسطة Rahma Apps</p>
+<section id="daily" class="section" aria-labelledby="h-daily">
+  <div class="wrap daily">
+    <div class="split">
+      <div class="copy">
+        <span class="rule"></span>
+        <h2 id="h-daily" class="h2">كل يوم</h2>
+        <p class="lead">افتح التطبيق فتجد دعاءً لمن اخترت، وباسمه إن أضفته. انتقل إلى دعاء آخر، واحفظ ما يلامس قلبك لتعود إليه متى شئت.</p>
+        <ol class="steps">
+          <li>
+            <span class="steps__n">1</span>
+            <div class="steps__body">
+              <span class="steps__t">اختر من تدعو له</span>
+              <span class="steps__d">وأضف اسمه إن شئت.</span>
+            </div>
+          </li>
+          <li>
+            <span class="steps__n">2</span>
+            <div class="steps__body">
+              <span class="steps__t">احفظ الدعاء في المفضلة</span>
+              <span class="steps__d">بلمسة واحدة على القلب.</span>
+            </div>
+          </li>
+          <li>
+            <span class="steps__n">3</span>
+            <div class="steps__body">
+              <span class="steps__t">اقرأه بهدوء</span>
+              <span class="steps__d">في صفحة قراءة خالية من الإعلانات.</span>
+            </div>
+          </li>
+        </ol>
+      </div>
+      <figure class="shot">
+        <div class="phone" style="--phone-w:min(310px,76vw)">
+          <img src="images/c1-home.png" alt="الشاشة الرئيسية مع دعاء باسم المدعو له" width="1080" height="2340" loading="lazy">
+        </div>
+        <figcaption class="caption">لقطة حقيقية من التطبيق — الاسم للتوضيح</figcaption>
+      </figure>
+    </div>
+    <div class="split split--rev daily__search">
+      <div class="copy">
+        <h3 class="h3">ابحث عن دعاء</h3>
+        <p class="lead">اكتب كلمة واحدة، مثل «الجنة»، لتصل إلى الأدعية التي تتضمنها.</p>
+      </div>
+      <figure class="shot">
+        <div class="phone" style="--phone-w:min(270px,70vw)">
+          <img src="images/c4-search.png" alt="شاشة البحث عن دعاء" width="1080" height="2340" loading="lazy">
+        </div>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section id="grave" class="section section--alt" aria-labelledby="h-grave">
+  <div class="wrap split split--rev">
+    <div class="copy">
+      <span class="rule"></span>
+      <h2 id="h-grave" class="h2">عند زيارة القبر</h2>
+      <p class="lead">صفحة مستقلة تجمع ما يُقرأ عند زيارة القبر، بخط واضح وهادئ، لتقرأه بسكينة.</p>
+      <p class="note">لا إعلانات في هذه الصفحة.</p>
+    </div>
+    <figure class="shot">
+      <div class="phone" style="--phone-w:min(290px,74vw)">
+        <img src="images/c5-grave-visit.png" alt="صفحة زيارة القبر" width="1080" height="2340" loading="lazy">
+      </div>
+    </figure>
+  </div>
+</section>
+
+<section id="reminder" class="section" aria-labelledby="h-rem">
+  <div class="wrap split">
+    <div class="copy">
+      <span class="rule"></span>
+      <h2 id="h-rem" class="h2">تذكير</h2>
+      <p class="reminder__claim">صباحًا في الوقت الذي تختاره، ومساءً، ويوم الجمعة إن أردت</p>
+      <p class="lead">فعّل التذكير الذي يناسبك واختر وقته، ليبقى الدعاء لمن تحب عادةً لا تنقطع.</p>
+    </div>
+    <figure class="shot" aria-label="قسم التذكير من الإعدادات">
+      <div class="phone phone--crop" style="--phone-w:min(320px,78vw)">
+        <div class="crop">
+          <img src="images/c6-settings.png" alt="إعدادات التذكير: الصباح والمساء والجمعة" width="1080" height="2340" loading="lazy">
+        </div>
+      </div>
+      <figcaption class="caption">الأوقات قابلة للتعديل</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section id="share" class="section section--alt" aria-labelledby="h-share">
+  <div class="wrap share">
+    <div class="share__intro">
+      <span class="rule"></span>
+      <h2 id="h-share" class="h2">شارك الأجر</h2>
+      <p class="lead">أرسل الدعاء لأهلك وأصدقائك ليدعوا معك، نصًّا أو صورةً بأحد ثلاثة تصاميم.</p>
+    </div>
+    <ul class="gallery" aria-label="تصاميم المشاركة كصورة">
+      <li>
+        <figure>
+          <img src="images/share-dark-luxe.webp" alt="دعاء مشارك كصورة بتصميم Dark Luxe" width="900" height="1200" loading="lazy">
+          <figcaption>
+            <span class="gallery__name" dir="ltr">Dark Luxe</span>
+            <span class="caption">صورة أنشأها التطبيق</span>
+          </figcaption>
+        </figure>
+      </li>
+      <li>
+        <figure>
+          <img src="images/share-emerald.webp" alt="دعاء مشارك كصورة بتصميم Emerald" width="1067" height="1200" loading="lazy">
+          <figcaption>
+            <span class="gallery__name" dir="ltr">Emerald</span>
+            <span class="caption">صورة أنشأها التطبيق</span>
+          </figcaption>
+        </figure>
+      </li>
+      <li>
+        <figure>
+          <img src="images/share-white.webp" alt="دعاء مشارك كصورة بتصميم White" width="900" height="1200" loading="lazy">
+          <figcaption>
+            <span class="gallery__name" dir="ltr">White</span>
+            <span class="caption">صورة أنشأها التطبيق</span>
+          </figcaption>
+        </figure>
+      </li>
+    </ul>
+    <div class="cards">
+      <div class="card">
+        <h3>مشاركة الدعاء كنص</h3>
+        <p class="card__free">مجانية دائمًا.</p>
+      </div>
+      <div class="card">
+        <h3>مشاركة الدعاء كصورة</h3>
+        <p>قد تتطلب مشاهدة إعلان اختياري.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="clarity" class="section" aria-labelledby="h-clar">
+  <div class="clarity">
+    <div class="clarity__head">
+      <h2 id="h-clar" class="h2">بوضوح</h2>
+      <p class="clarity__claim">مجاني، مع إعلانات محدودة.</p>
+    </div>
+    <div class="clarity__rule"></div>
+    <ul>
+      <li><span class="diamond"></span><span>إعلانات محدودة في بعض أقسام التطبيق.</span></li>
+      <li><span class="diamond"></span><span>لا إعلانات أثناء قراءة الدعاء أو في صفحة زيارة القبر.</span></li>
+      <li><span class="diamond"></span><span>بعض الميزات، مثل مشاركة الدعاء كصورة، قد تتطلب إعلانًا اختياريًا.</span></li>
+      <li><span class="diamond"></span><span>مشاركة الدعاء كنص مجانية دائمًا.</span></li>
+      <li><span class="diamond"></span><span>لا حساب ولا تسجيل، وتُحفظ اختياراتك ومفضلاتك على جهازك.</span></li>
+    </ul>
+  </div>
+</section>
+
+<section id="download" class="cta" aria-labelledby="h-cta">
+  <div class="cta__inner">
+    <img class="cta__icon" src="Logo.jpg" alt="" width="72" height="72">
+    <h2 id="h-cta">ادعُ لمن تحب، كل يوم</h2>
+    <p>مجاني، مع إعلانات محدودة. متوفر على Android.</p>
+    <a class="btn-light" href="https://play.google.com/store/apps/details?id=com.joumane.allahomairhamabi" data-cta="google-play-main">حمّل التطبيق من Google Play</a>
+  </div>
+</section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="site-footer__inner">
+    <div class="site-footer__brand">
+      <img src="Logo.jpg" alt="" width="28" height="28">
+      <span dir="ltr">© 2026 Rahma Applications</span>
+    </div>
+    <nav aria-label="روابط">
+      <a href="privacy_ar.html">سياسة الخصوصية</a>
+      <a href="privacy_fr.html" lang="fr" dir="ltr">Politique de confidentialité</a>
+      <a href="https://play.google.com/store/apps/details?id=com.joumane.allahomairhamabi" data-cta="google-play-footer">Google Play</a>
+    </nav>
+  </div>
 </footer>
 
 </body>
 </html>
-
-
-
-
