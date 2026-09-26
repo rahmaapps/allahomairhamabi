@@ -71,8 +71,9 @@ flutter_native_splash:
   android_12:
     color: "#FFFBF1"
     color_dark: "#16211C"
-    image: assets/splash/splash_icon.png
-    image_dark: assets/splash/splash_icon_dark.png
+    # 1152x1152, signe dans le cercle central de 768 px (zone visible Android 12+)
+    image: assets/splash/splash_android12.png
+    image_dark: assets/splash/splash_android12_dark.png
 
 # Launcher icons Android : ressources P2-H gérées manuellement (adaptive
 # foreground/monochrome vectoriels + mipmaps legacy, source
