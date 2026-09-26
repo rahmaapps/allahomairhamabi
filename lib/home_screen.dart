@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -729,9 +728,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Future<void> _rebuildDeckFiltered({int? excludeId}) async {
 
-    // ✅ DEBUG ICI (1ère ligne)
-    debugPrint("INSIDE rebuild personsData: $personsData");
-
     await _refreshLengthFilter();
 
     // Pool scindé par personnes sélectionnées (repli interne sur 'general'
@@ -754,15 +750,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     _deckIds.shuffle();
     _deckCursor = 0;
-
-    debugPrint(
-        '[DECK] cat=$_activeCategory len=$_lengthFilter persons=${personsData.keys.toList()} -> ids=${_deckIds.length}');
   }
 
   Future<void> _showNextFromDeck({bool isCategoryChange = false}) async {
 
     if (personsData.isEmpty) {
-      debugPrint("⚠️ force rebuild (no persons)");
       _deckIds.clear();
     }
     // recréer deck si vide
@@ -786,7 +778,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     final d = await _repo.getById(id);
     if (d == null) {
-      debugPrint("⚠️ Aucun douaa trouvé !");
       await _loadRandomDua(ignoreCategory: true, isCategoryChange: isCategoryChange);
       return;
     }

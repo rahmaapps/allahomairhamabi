@@ -39,7 +39,6 @@ flutter:
     - assets/premium/previews/dark_luxe_thumb.png
     - assets/premium/previews/emerald_thumb.png
     - assets/premium/previews/white_elegant_thumb.png
-    - assets/splash/splash_gold.png
     - assets/splash/splash_icon.png
     - assets/icon/app_icon.png
     - assets/premium/templates/dark_luxe.png
@@ -65,7 +64,7 @@ flutter_native_splash:
   color: "#FFFBF1"
   color_dark: "#16211C"
   image: assets/splash/splash_icon.png
-  image_dark: assets/splash/splash_icon.png
+  image_dark: assets/splash/splash_icon_dark.png
   android: true
   ios: false
   web: false
@@ -73,7 +72,7 @@ flutter_native_splash:
     color: "#FFFBF1"
     color_dark: "#16211C"
     image: assets/splash/splash_icon.png
-    image_dark: assets/splash/splash_icon.png
+    image_dark: assets/splash/splash_icon_dark.png
 
 # Launcher icons Android : ressources P2-H gérées manuellement (adaptive
 # foreground/monochrome vectoriels + mipmaps legacy, source

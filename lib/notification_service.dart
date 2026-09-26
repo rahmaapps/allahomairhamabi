@@ -413,39 +413,26 @@ class NotificationService {
   /// quel que soit le point d'échec (`cancel` ou `zonedSchedule`). Annule
   /// d'abord tout rappel déjà planifié pour ce même id — nécessaire
   /// notamment lors d'un changement d'heure, pour éviter un `PendingIntent`
-  /// orphelin ; un échec de cette annulation (ex. rien à annuler) est
-  /// journalisé mais n'empêche pas la tentative de planification.
+  /// orphelin ; un échec de cette annulation (ex. rien à annuler)
+  /// n'empêche pas la tentative de planification.
   Future<bool> _scheduleZoned({
     required ({String channelId, int notificationId, String title, String body}) content,
     required tz.TZDateTime scheduledDate,
     required DateTimeComponents matchDateTimeComponents,
     required String periodId,
   }) async {
-    // ⚠️ INSTRUMENTATION TEMPORAIRE DE DIAGNOSTIC (release) — à retirer une
-    // fois la cause de l'échec de planification confirmée. Volontairement
-    // NON gardée par `kDebugMode` : doit rester visible dans `adb logcat`
-    // sur un build --release.
-    debugPrint(
-      '[NotifDiag] $periodId : notificationId=${content.notificationId}, '
-      'channelId=${content.channelId}, scheduledDate=$scheduledDate, '
-      'location=${scheduledDate.location.name}, tz.local=${tz.local.name}, '
-      'matchDateTimeComponents=$matchDateTimeComponents',
-    );
-
     try {
       await _plugin.cancel(content.notificationId);
-      debugPrint('[NotifDiag] $periodId : cancel() OK');
-    } catch (e, s) {
-      debugPrint('[NotifDiag] $periodId : cancel() a ÉCHOUÉ : $e\n$s');
+    } catch (_) {
+      // Échec d'annulation (ex. rien à annuler) : n'empêche pas la
+      // tentative de planification.
     }
 
     final details = _reminderDetails(content.channelId);
 
     final canExact = await canScheduleExactAlarms();
-    debugPrint('[NotifDiag] $periodId : canScheduleExactNotifications() -> $canExact');
 
     Future<bool> attempt(AndroidScheduleMode mode) async {
-      debugPrint('[NotifDiag] $periodId : tentative zonedSchedule() en mode $mode');
       try {
         await _plugin.zonedSchedule(
           content.notificationId,
@@ -462,25 +449,20 @@ class NotificationService {
           uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
           matchDateTimeComponents: matchDateTimeComponents,
         );
-        debugPrint('[NotifDiag] $periodId : zonedSchedule() OK en mode $mode');
         return true;
-      } catch (e, s) {
-        debugPrint('[NotifDiag] $periodId : zonedSchedule() a ÉCHOUÉ en mode $mode : $e\n$s');
+      } catch (_) {
         return false;
       }
     }
 
     if (canExact) {
-      debugPrint('[NotifDiag] $periodId : mode retenu = exactAllowWhileIdle');
       if (await attempt(AndroidScheduleMode.exactAllowWhileIdle)) return true;
       // Le mode exact était censé être autorisé mais a réellement échoué à
       // l'exécution (ex. permission révoquée entre la vérification et
       // l'appel) — repli immédiat en mode inexact plutôt qu'abandonner.
-      debugPrint('[NotifDiag] $periodId : repli sur inexactAllowWhileIdle');
       return attempt(AndroidScheduleMode.inexactAllowWhileIdle);
     }
 
-    debugPrint('[NotifDiag] $periodId : mode retenu = inexactAllowWhileIdle (exact indisponible)');
     return attempt(AndroidScheduleMode.inexactAllowWhileIdle);
   }
 

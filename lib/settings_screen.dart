@@ -18,29 +18,6 @@ import 'widgets/app_card.dart';
 import 'widgets/app_snackbar.dart';
 import 'widgets/rewarded_confirmation_sheet.dart';
 
-/// Conservée uniquement pour compatibilité avec
-/// `test/settings_screen_lot3g_test.dart` (logique pure de replanification
-/// du vendredi, sans dépendance à `workmanager`, retiré du projet — voir
-/// [NotificationService.scheduleWeeklyReminder] pour la planification
-/// réelle des rappels, qui n'a plus aucun rapport avec cette classe).
-class WorkManagerService {
-  /// Prochaine occurrence **calendaire** de vendredi à `hour:minute`.
-  ///
-  /// `now` est injectable uniquement pour les tests (`@visibleForTesting`) ;
-  /// l'appel réel ne le fournit jamais et utilise `DateTime.now()`.
-  @visibleForTesting
-  static Duration initialDelayForNextFriday(int hour, int minute, {DateTime? now}) {
-    final n = now ?? DateTime.now();
-    final daysUntilFriday = (DateTime.friday - n.weekday) % 7;
-    var scheduled = DateTime(n.year, n.month, n.day, hour, minute)
-        .add(Duration(days: daysUntilFriday));
-    if (!scheduled.isAfter(n)) {
-      scheduled = scheduled.add(const Duration(days: 7));
-    }
-    return scheduled.difference(n);
-  }
-}
-
 /// Paramètres — spécification consolidée (docs/ui_ux/ETAT_CONSOLIDE_UI_UX.md,
 /// §4) adaptée par les décisions verrouillées du LOT 3.G : بعد الظهر
 /// supprimé, تدعو لـ retiré de cet écran (déjà accessible ailleurs). Les 3
