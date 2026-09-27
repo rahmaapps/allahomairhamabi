@@ -4,22 +4,21 @@ import 'interstitial_trigger.dart';
 
 /// Policy pure (aucune dépendance widget/écran, entièrement testable) qui
 /// détermine où une bannière future pourrait apparaître. Décisions produit
-/// verrouillées (audit LOT 5.A) : bannières limitées à HOME/Recherche/
-/// Favoris ; Grave Visit, DuaRead, Onboarding et Splash restent strictement
-/// hors publicité. LOT 5.A n'appelle cette policy nulle part dans l'UI —
+/// verrouillées : bannières limitées à Recherche/Favoris (HOME retiré le
+/// 27/09/2026, décision post-QA) ; HOME, Grave Visit, DuaRead, Onboarding
+/// et Splash restent strictement hors bannière. LOT 5.A n'appelle cette policy nulle part dans l'UI —
 /// elle est préparée pour un futur lot qui affichera réellement des
 /// bannières.
 class AdsPolicy {
   const AdsPolicy._();
 
   static const Set<AdSurface> _bannerEligibleSurfaces = {
-    AdSurface.home,
     AdSurface.search,
     AdSurface.favorites,
   };
 
   /// `true` si [surface] fait partie des emplacements verrouillés pour une
-  /// bannière (HOME, Recherche, Favoris).
+  /// bannière (Recherche, Favoris).
   static bool isBannerEligible(AdSurface surface) =>
       _bannerEligibleSurfaces.contains(surface);
 

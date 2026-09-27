@@ -17,9 +17,10 @@ import '../widgets/app_snackbar.dart';
 /// Écran de lecture mutualisé — **une carte de lecture agrandie**, pas un
 /// écran distinct (LOT 3.I, docs/ui_ux/LOT_3I_DUAREADSCREEN_SPEC.md).
 /// Ouvert depuis Recherche et Favoris. AppBar minimaliste (retour seul,
-/// zone B vide) ; carte N1 (`AppCard(level: hero)`, rosace incluse — §A.3
-/// option (a) : c'est littéralement « la carte du douʿā agrandie », aucune
-/// duplication locale) ; texte `duaLong` ; ♥ dans le **pied de la carte**,
+/// zone B vide) ; carte N1 (`AppCard(level: hero)`, sans rosace depuis la
+/// décision post-QA du 27/09/2026 — `showPattern: false`, comme la carte du
+/// HOME ; §A.3 option (a) : c'est littéralement « la carte du douʿā
+/// agrandie », aucune duplication locale) ; texte `duaLong` ; ♥ dans le **pied de la carte**,
 /// jamais dans l'AppBar ; نسخ/مشاركة sous la carte. Aucun fade/blur/gradient
 /// sur le texte religieux : le scroll se termine par une coupure nette.
 class DuaReadScreen extends StatefulWidget {
@@ -175,6 +176,9 @@ class _DuaReadScreenState extends State<DuaReadScreen>
                     Expanded(
                       child: AppCard(
                         level: AppCardLevel.hero,
+                        // Sans rosace en filigrane (décision post-QA) ;
+                        // fond, filet d'or, arrondis et ombre inchangés.
+                        showPattern: false,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [

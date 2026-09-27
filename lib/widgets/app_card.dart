@@ -28,16 +28,21 @@ class AppCard extends StatelessWidget {
     super.key,
     required this.child,
     this.level = AppCardLevel.hero,
+    this.showPattern = true,
   });
 
   final Widget child;
   final AppCardLevel level;
 
+  /// N1 uniquement : peint la rosace en filigrane. `false` pour la carte du
+  /// douʿā du HOME (décision post-QA) ; sans effet sur N2/N3.
+  final bool showPattern;
+
   @override
   Widget build(BuildContext context) {
     switch (level) {
       case AppCardLevel.hero:
-        return _HeroCard(child: child);
+        return _HeroCard(showPattern: showPattern, child: child);
       case AppCardLevel.content:
         return _ContentCard(child: child);
       case AppCardLevel.settingsGroup:
@@ -48,9 +53,10 @@ class AppCard extends StatelessWidget {
 
 /// N1 — comportement strictement inchangé depuis le LOT 1B/1B.2.
 class _HeroCard extends StatelessWidget {
-  const _HeroCard({required this.child});
+  const _HeroCard({required this.child, this.showPattern = true});
 
   final Widget child;
+  final bool showPattern;
 
   @override
   Widget build(BuildContext context) {
@@ -70,16 +76,17 @@ class _HeroCard extends StatelessWidget {
             Positioned.fill(
               child: ColoredBox(color: cs.surface),
             ),
-            Positioned.fill(
-              child: CustomPaint(
-                painter: IslamicGoldPatternPainter(
-                  isDark: isDark,
-                  onSurface: cs.onSurface,
-                  fillOpacity: 0.055,
-                  strokeOpacity: 0.055,
+            if (showPattern)
+              Positioned.fill(
+                child: CustomPaint(
+                  painter: IslamicGoldPatternPainter(
+                    isDark: isDark,
+                    onSurface: cs.onSurface,
+                    fillOpacity: 0.055,
+                    strokeOpacity: 0.055,
+                  ),
                 ),
               ),
-            ),
             Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [

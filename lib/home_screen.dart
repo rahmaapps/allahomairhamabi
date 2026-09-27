@@ -9,7 +9,6 @@ import 'package:share_plus/share_plus.dart';
 
 import 'dua_repository.dart';
 import 'models/dua.dart';
-import 'monetization/ad_surface.dart';
 import 'monetization/interstitial_ad_controller.dart';
 import 'monetization/interstitial_trigger.dart';
 import 'monetization/rewarded_wording.dart';
@@ -23,7 +22,6 @@ import 'search_screen.dart';
 import 'screens/person_selection_screen.dart';
 import 'screens/grave_visit_read_screen.dart';
 import 'premium_templates.dart';
-import 'widgets/banner_ad_slot.dart';
 import 'widgets/premium_export_card.dart';
 import 'widgets/app_snackbar.dart';
 import 'widgets/rewarded_confirmation_sheet.dart';
@@ -96,6 +94,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // partagée, quelle que soit la longueur du dou'a. PremiumExportCard
   // restreint elle-même le rendu Dark Luxe paginé à sa première page.
   final GlobalKey _exportKey = GlobalKey();
+  // Mesure de position du feedback de copie (voir `_copyFeedbackMargin`).
+  final GlobalKey _copyShareKey = GlobalKey();
+  final GlobalKey _bodyKey = GlobalKey();
   PremiumTemplate _selectedTemplate = PremiumTemplate.darkLuxe;
 
   // Espace réservé en bas de la carte pour le pied (♡ + « دعاء آخر ») :
@@ -137,6 +138,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _categoryAnimCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 240),
+      // Au repos (fin d'animation) : `_categorySlide` vaut 0 dès le premier
+      // affichage — sinon le texte restait décalé de 16 dp jusqu'au premier
+      // changement de catégorie. `forward(from: 0)` inchangé.
+      value: 1.0,
     );
     _categorySlide = Tween<double>(begin: 16, end: 0).animate(
       CurvedAnimation(parent: _categoryAnimCtrl, curve: Curves.easeInOutCubic),
@@ -329,11 +334,34 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     HapticFeedback.selectionClick();
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('تم النسخ ✓'),
-        duration: Duration(seconds: 1),
+      SnackBar(
+        content: const Text('تم النسخ ✓'),
+        duration: const Duration(seconds: 1),
+        // Flottant, au-dessus de la rangée نسخ / مشاركة : en mode `fixed`,
+        // le snackbar s'ancrait au bas du `Scaffold` et recouvrait la rangée
+        // d'actions, en partie sous la barre de navigation Android.
+        behavior: SnackBarBehavior.floating,
+        margin: _copyFeedbackMargin(),
       ),
     );
+  }
+
+  /// Marge du feedback de copie : place le snackbar flottant juste
+  /// au-dessus de la rangée نسخ / مشاركة, quelle que soit sa disposition
+  /// réelle (horizontale, verticale, paysage). Mesurée au moment du tap,
+  /// depuis le bas du contenu du `SafeArea` du `body` : comme l'ancrage
+  /// d'un snackbar flottant (`Scaffold`), il s'arrête au-dessus de la barre
+  /// de navigation Android — l'inset n'est donc compté qu'une fois.
+  /// `null` (marge flottante par défaut) si la mesure est impossible.
+  EdgeInsets? _copyFeedbackMargin() {
+    final row = _copyShareKey.currentContext?.findRenderObject() as RenderBox?;
+    final body = _bodyKey.currentContext?.findRenderObject() as RenderBox?;
+    if (row == null || body == null || !row.hasSize || !body.hasSize) return null;
+
+    final rowTop = row.localToGlobal(Offset.zero).dy;
+    final bodyBottom = body.localToGlobal(Offset(0, body.size.height)).dy;
+    final bottom = math.max(bodyBottom - rowTop + AppSpacing.sm, 0.0);
+    return EdgeInsets.fromLTRB(AppSpacing.lg, 0, AppSpacing.lg, bottom);
   }
 
   void _shareDuaText() {
@@ -1170,6 +1198,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   /// `duaCard` sans jamais instancier `AppCard`.
   Widget _buildDuaCardContent(ColorScheme cs, bool isDark, bool isLandscape) {
     return AppCard(
+      // Carte du douʿā du HOME sans rosace en filigrane (décision post-QA :
+      // gênait la lecture) ; fond, filet d'or, arrondis et ombre inchangés.
+      showPattern: false,
       child: Stack(
         children: [
           // Zone de texte contrainte pour exclure structurellement la
@@ -1241,22 +1272,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     // déjà utilisés par AppBarTheme lui-même (LOT 1A).
     final appBarForeground = isDark ? AppColorsDark.textPrimary : AppColorsLight.onPrimary;
 
-    // Inset bas système, capturé ICI (avant que `Scaffold` ne l'efface) :
-    // dès qu'un `bottomNavigationBar` est fourni, `Scaffold` retire
-    // inconditionnellement le padding bas de `MediaQuery` transmis au
-    // `body` — quelle que soit la hauteur RÉELLEMENT rendue par ce
-    // `bottomNavigationBar` (mécanique interne de `Scaffold`, indépendante
-    // de `BannerAdSlot`). Or `BannerAdSlot` (§ LOT 5.B) rend une hauteur
-    // NULLE tant qu'aucune annonce n'est chargée — un état courant, pas un
-    // cas limite. Le `SafeArea` du `body` ci-dessous ne voit alors plus
-    // aucun inset à respecter et le pied de carte (♡ + نسخ/مشاركة) se
-    // retrouve peint au ras du bord physique, sous la barre de navigation
-    // Android (edge-to-edge, constaté sur appareil réel). Même classe de
-    // correctif que `MediaQuery.viewPaddingOf` déjà utilisé pour les
-    // feuilles modales de cet écran (`_openTemplatePicker`,
-    // `_openGraveVisitPersonPicker`) face à la même mécanique `Scaffold`.
-    final bottomSystemInset = MediaQuery.paddingOf(context).bottom;
-
     // Rail paysage (LOT HOME LANDSCAPE — décision UX validée) : en paysage,
     // les chips catégories et la ligne « pour qui » quittent la colonne
     // verticale pour un rail latéral gauche de 108dp, à côté de la carte au
@@ -1296,7 +1311,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     // ---- نسخ / مشاركة — inchangés (hauteur 48, bascule horizontale/
     // verticale existante), placés sous la carte dans les deux orientations.
-    final copyShareRow = _buildCopyShareActions();
+    final copyShareRow = KeyedSubtree(
+      key: _copyShareKey,
+      child: _buildCopyShareActions(),
+    );
 
     final Widget bodyContent = isLandscape
         ? Row(
@@ -1409,21 +1427,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ),
             body: SafeArea(
               child: Padding(
-                padding: EdgeInsets.fromLTRB(
+                key: _bodyKey,
+                padding: const EdgeInsets.fromLTRB(
                   AppSpacing.xl,
                   AppSpacing.lg,
                   AppSpacing.xl,
-                  AppSpacing.lg + bottomSystemInset,
+                  AppSpacing.lg,
                 ),
                 child: bodyContent,
               ),
             ),
-            // LOT 5.B — bannière adaptive anchored : hauteur nulle tant
-            // qu'aucune annonce n'est chargée, jamais de chevauchement avec
-            // le contenu (`bottomNavigationBar` est un slot Scaffold séparé
-            // du `body`, qui n'affecte son layout interne que par la
-            // hauteur réellement rendue ici).
-            bottomNavigationBar: const BannerAdSlot(surface: AdSurface.home),
           ),
 
           // ---- Rendu hors écran pour l'export Premium (capture PNG) ----
@@ -1450,20 +1463,30 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           // passant des contraintes non bornées à son enfant : le
           // RepaintBoundary est alors layouté exactement à
           // template.fixedTemplateSize, indépendamment de l'écran.
-          IgnorePointer(
-            child: Opacity(
-              opacity: 0.01,
-              child: OverflowBox(
-                minWidth: 0,
-                minHeight: 0,
-                maxWidth: double.infinity,
-                maxHeight: double.infinity,
-                alignment: Alignment.topLeft,
-                child: RepaintBoundary(
-                  key: _exportKey,
-                  child: PremiumExportCard(
-                    template: _selectedTemplate,
-                    duaText: _currentDuaText,
+          //
+          // Transform.translate (post-QA) : même à 1 %, le modèle restait
+          // perceptible en filigrane derrière le HOME. Décalé d'une largeur
+          // d'écran, il est peint hors du cadre visible (clippé par le Stack)
+          // sans changer ni son layout ni ses contraintes ; `toImage()`
+          // capture la couche du RepaintBoundary, indépendamment de sa
+          // position à l'écran.
+          Transform.translate(
+            offset: Offset(MediaQuery.sizeOf(context).width, 0),
+            child: IgnorePointer(
+              child: Opacity(
+                opacity: 0.01,
+                child: OverflowBox(
+                  minWidth: 0,
+                  minHeight: 0,
+                  maxWidth: double.infinity,
+                  maxHeight: double.infinity,
+                  alignment: Alignment.topLeft,
+                  child: RepaintBoundary(
+                    key: _exportKey,
+                    child: PremiumExportCard(
+                      template: _selectedTemplate,
+                      duaText: _currentDuaText,
+                    ),
                   ),
                 ),
               ),

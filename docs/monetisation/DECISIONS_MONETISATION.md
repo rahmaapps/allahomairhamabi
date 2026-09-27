@@ -33,8 +33,8 @@ La série Monétisation a été validée sous forme d'énoncés, **sans numérot
 
 | # | Décision (énoncé validé) | Preuve dans le code |
 |---|---|---|
-| **D8** | Bannières **uniquement** sur : HOME, Recherche, Favoris. | `AdsPolicy._bannerEligibleSurfaces` ; `BannerAdSlot` importé par ces 3 écrans seulement |
-| **D9** | **Aucune bannière** sur : DuaRead, Grave Visit, Onboarding, Splash, Paramètres. | `AdsPolicy.isBannerEligible` (liste d'autorisation) + absence d'import |
+| **D8** | Bannières **uniquement** sur : Recherche, Favoris. *(Révisé le 27/09/2026 : HOME retiré — décision post-QA « HOME sans bannière » ; énoncé initial : HOME, Recherche, Favoris.)* | `AdsPolicy._bannerEligibleSurfaces` ; `BannerAdSlot` importé par ces 2 écrans seulement |
+| **D9** | **Aucune bannière** sur : HOME (depuis le 27/09/2026), DuaRead, Grave Visit, Onboarding, Splash, Paramètres. | `AdsPolicy.isBannerEligible` (liste d'autorisation) + absence d'import |
 
 ### Interstitiels (LOT 5.C)
 

@@ -12,9 +12,9 @@ import '../monetization/monetization_bootstrap.dart';
 /// contenu principal, jamais d'espace résiduel en cas d'échec/refus
 /// (§ audit LOT 5.B).
 ///
-/// À placer UNIQUEMENT sur `Scaffold.bottomNavigationBar` de HOME
-/// (`AdSurface.home`), Recherche (`AdSurface.search`) et Favoris
-/// (`AdSurface.favorites`). Ne JAMAIS l'ajouter à DuaRead, Grave Visit,
+/// À placer UNIQUEMENT sur `Scaffold.bottomNavigationBar` de Recherche
+/// (`AdSurface.search`) et Favoris (`AdSurface.favorites`). Ne JAMAIS
+/// l'ajouter à HOME (retiré le 27/09/2026), DuaRead, Grave Visit,
 /// Onboarding, Splash ou Settings — `AdsPolicy` refuse déjà ces surfaces
 /// en interne, mais la règle produit verrouillée reste : ce composant n'est
 /// tout simplement jamais importé par ces écrans.

@@ -32,7 +32,7 @@ Socle, sans aucun affichage publicitaire.
 - `BannerAdSlot` (widget) + `BannerAdSlotController` + `BannerAdLoader` / `GoogleBannerAdLoader` ;
 - Bannière adaptive anchored, **hauteur nulle** tant qu'aucune annonce n'est chargée, aucun espace résiduel en cas d'échec ;
 - Une seule tentative de chargement par instance, aucune boucle de retry ;
-- Surfaces : HOME, Recherche, Favoris (D8) — jamais ailleurs (D9).
+- Surfaces : Recherche, Favoris (D8, révisé le 27/09/2026 : HOME retiré) — jamais ailleurs (D9).
 
 ## LOT 5.C — Interstitiels — TERMINÉ
 
@@ -68,7 +68,7 @@ Lot **technique** : aucune décision produit modifiée, aucune surface publicita
 - **Environnement explicite** : `--dart-define=ADS_ENV=test|production`, **défaut `test`**. Un build release ordinaire reste en test ; la production ne s'active jamais implicitement.
 - **Source unique de vérité pour l'App ID** : `android/ads_ids.properties`, lu par Gradle pour alimenter le placeholder `${admobAppId}` du manifest, et contrôlé côté Dart par `test/monetization/ads_config_test.dart`. Le manifest ne peut plus diverger de `AdsConfig`.
 - **Fail-fast** : un build `ADS_ENV=production` échoue tant que les identifiants réels ne sont pas renseignés, et une valeur `ADS_ENV` invalide échoue aussi.
-- **Accesseurs neutres** : `AdsConfig.appId` / `bannerAdUnitId` / `interstitialAdUnitId` — **une seule** unité Banner pour HOME, Recherche et Favoris (les surfaces restent distinguées par `AdSurface`).
+- **Accesseurs neutres** : `AdsConfig.appId` / `bannerAdUnitId` / `interstitialAdUnitId` — **une seule** unité Banner pour Recherche et Favoris (HOME retiré le 27/09/2026) (les surfaces restent distinguées par `AdSurface`).
 - **Appareils de test** : `--dart-define=ADS_TEST_DEVICE_IDS=<id1>,<id2>`, vide par défaut, jamais committé.
 - **`maxAdContentRating = G`** appliqué au point central d'initialisation. **Plafond déclaratif, pas une garantie de filtrage** : le blocage de catégories se fait dans la console AdMob et se contrôle a posteriori dans l'Ad Review Center.
 - **Correction A2** : `AdsActivation` rejoue le contrôle `canRequestAds()` après la fermeture des options de confidentialité — le SDK devient initialisable dans la même session, sans redémarrage. Idempotent, sûr en concurrence, non bloquant, n'affiche aucune publicité. Un refus continue d'interdire toute requête.

@@ -23,9 +23,8 @@ String _readCode(String path) {
 }
 
 void main() {
-  group('Bannières — 3 surfaces autorisées, et elles seules (D8/D9)', () {
+  group('Bannières — 2 surfaces autorisées, et elles seules (D8/D9)', () {
     const allowed = <String, AdSurface>{
-      'lib/home_screen.dart': AdSurface.home,
       'lib/search_screen.dart': AdSurface.search,
       'lib/favorites_screen.dart': AdSurface.favorites,
     };
@@ -42,6 +41,7 @@ void main() {
     });
 
     const excluded = <String, String>{
+      'lib/home_screen.dart': 'HOME (retiré le 27/09/2026)',
       'lib/screens/dua_read_screen.dart': 'DuaRead (lecture)',
       'lib/screens/grave_visit_read_screen.dart': 'Grave Visit',
       'lib/screens/onboarding_screen.dart': 'Onboarding',
@@ -61,8 +61,7 @@ void main() {
 
     test('la policy refuse toutes les surfaces non autorisées', () {
       for (final surface in AdSurface.values) {
-        final expected = surface == AdSurface.home ||
-            surface == AdSurface.search ||
+        final expected = surface == AdSurface.search ||
             surface == AdSurface.favorites;
         expect(AdsPolicy.isBannerEligible(surface), expected);
       }

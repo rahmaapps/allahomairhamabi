@@ -5,15 +5,15 @@ import 'package:test_1/monetization/ads_policy.dart';
 
 void main() {
   group('AdsPolicy.isBannerEligible — contraintes produit verrouillées', () {
-    test('HOME, Recherche et Favoris sont éligibles à une bannière', () {
-      expect(AdsPolicy.isBannerEligible(AdSurface.home), isTrue);
+    test('Recherche et Favoris sont éligibles à une bannière', () {
       expect(AdsPolicy.isBannerEligible(AdSurface.search), isTrue);
       expect(AdsPolicy.isBannerEligible(AdSurface.favorites), isTrue);
     });
 
     test(
-        'Grave Visit, DuaRead, Onboarding, Splash et Share as Image ne sont '
-        'JAMAIS éligibles à une bannière', () {
+        'HOME, Grave Visit, DuaRead, Onboarding, Splash et Share as Image ne '
+        'sont JAMAIS éligibles à une bannière', () {
+      expect(AdsPolicy.isBannerEligible(AdSurface.home), isFalse);
       expect(AdsPolicy.isBannerEligible(AdSurface.graveVisit), isFalse);
       expect(AdsPolicy.isBannerEligible(AdSurface.duaRead), isFalse);
       expect(AdsPolicy.isBannerEligible(AdSurface.onboarding), isFalse);
@@ -38,7 +38,7 @@ void main() {
     test('false si canRequestAds (source unique de vérité UMP) est faux',
         () {
       final result = AdsPolicy.canShowBanner(
-        surface: AdSurface.home,
+        surface: AdSurface.search,
         canRequestAds: false,
         adsFreeStatus: adFree,
       );
@@ -50,7 +50,7 @@ void main() {
       final suppressedUntil = now.add(const Duration(minutes: 10));
 
       final result = AdsPolicy.canShowBanner(
-        surface: AdSurface.home,
+        surface: AdSurface.search,
         canRequestAds: true,
         adsFreeStatus: AdsFreeStatus(suppressedUntil),
         now: now,

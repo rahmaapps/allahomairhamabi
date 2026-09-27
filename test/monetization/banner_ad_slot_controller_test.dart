@@ -9,7 +9,7 @@ import 'fakes/fake_banner_ad_loader.dart';
 import 'fakes/fake_consent_service.dart';
 
 BannerAdSlotController _buildController({
-  AdSurface surface = AdSurface.home,
+  AdSurface surface = AdSurface.search,
   required FakeConsentService consent,
   required FakeBannerAdLoader loader,
   bool sdkInitialized = true,

@@ -39,7 +39,7 @@ void main() {
       final availability = AdsAvailability(consent)..markSdkInitialized();
 
       await tester.pumpWidget(_wrap(BannerAdSlot(
-        surface: AdSurface.home,
+        surface: AdSurface.search,
         adsAvailability: availability,
         loader: loader,
       )));
@@ -57,7 +57,7 @@ void main() {
       final availability = AdsAvailability(consent)..markSdkInitialized();
 
       await tester.pumpWidget(_wrap(BannerAdSlot(
-        surface: AdSurface.home,
+        surface: AdSurface.search,
         adsAvailability: availability,
         loader: loader,
       )));
@@ -81,7 +81,7 @@ void main() {
       final availability = AdsAvailability(consent)..markSdkInitialized();
 
       await tester.pumpWidget(_wrap(BannerAdSlot(
-        surface: AdSurface.home,
+        surface: AdSurface.search,
         adsAvailability: availability,
         loader: loader,
       )));
@@ -102,7 +102,7 @@ void main() {
       final availability = AdsAvailability(consent)..markSdkInitialized();
 
       await tester.pumpWidget(_wrap(BannerAdSlot(
-        surface: AdSurface.home,
+        surface: AdSurface.search,
         adsAvailability: availability,
         loader: loader,
       )));

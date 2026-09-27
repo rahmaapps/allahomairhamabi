@@ -99,8 +99,8 @@ class AdsConfig {
   /// toute divergence fait échouer `ads_config_test.dart`.
   static const String productionAppId = 'ca-app-pub-2998944710358464~3134659675';
 
-  /// **Une seule** unité Banner pour les trois surfaces autorisées (HOME,
-  /// Recherche, Favoris) — décision produit LOT 5.F. La distinction des
+  /// **Une seule** unité Banner pour les surfaces autorisées (Recherche,
+  /// Favoris) — décision produit LOT 5.F. La distinction des
   /// surfaces reste portée par `AdSurface`, jamais par l'unité.
   static const String productionBannerAdUnitId =
       'ca-app-pub-2998944710358464/4992782235';
