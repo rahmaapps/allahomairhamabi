@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+@font-face{font-family:"Lateef";src:url("assets/fonts/Lateef-Regular.ttf") format("truetype");}
+html,body{margin:0;background:#F7F3E8;color:#1F2A23;}
+a{color:#0F7A45;}a:hover{color:#0A5C34;}
+</style>
+</helmet>
+<main style="max-width:940px;margin:0 auto;padding:56px 28px 96px;font-family:'IBM Plex Sans',sans-serif;font-size:15px;line-height:1.6;display:flex;flex-direction:column;gap:56px;">
+
+<header style="display:flex;flex-direction:column;gap:14px;border-bottom:1px solid #DDD5C0;padding-bottom:32px;">
+  <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#5A6259;">Rahma · Spécification identité v1.0 · 28/09/2026</div>
+  <h1 style="margin:0;font-size:36px;line-height:1.15;font-weight:600;letter-spacing:-.01em;text-wrap:balance;">Icône, logo et splash — analyse de la référence et spécification</h1>
+  <div style="font-family:'Lateef',serif;font-size:40px;line-height:1.2;color:#0F7A45;direction:rtl;text-align:right;">اللهم ارحم أبي</div>
+  <p style="margin:0;max-width:680px;color:#3C463F;text-wrap:pretty;">Critère n°1 : un nouvel utilisateur comprend immédiatement « deux mains levées pour faire une douaa ». Aucune nouvelle métaphore : la silhouette de la référence est conservée, puis corrigée pour la lisibilité et les contraintes des plateformes.</p>
+</header>
+
+<section style="display:flex;flex-direction:column;gap:20px;">
+  <h2 style="margin:0;font-size:22px;font-weight:600;display:flex;gap:14px;align-items:baseline;"><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#0F7A45;">01</span>Analyse de l'image de référence</h2>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px;">
+    <figure style="margin:0;display:flex;flex-direction:column;gap:8px;">
+      <img src="assets/reference/icone-nb.jpg" alt="Référence Nano Banana" style="width:100%;aspect-ratio:1;display:block;border:1px solid #DDD5C0;">
+      <figcaption style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#5A6259;">Référence (1024²) — nouvelle direction</figcaption>
+    </figure>
+    <figure style="margin:0;display:flex;flex-direction:column;gap:8px;">
+      <img src="assets/icon/app_icon.png" alt="Icône actuelle" style="width:100%;aspect-ratio:1;display:block;border:1px solid #DDD5C0;">
+      <figcaption style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#5A6259;">Icône actuelle — assets/icon/app_icon.png (identique à splash_gold.png)</figcaption>
+    </figure>
+  </div>
+
+  <div style="display:grid;grid-template-columns:minmax(150px,200px) minmax(0,1fr);border-top:1px solid #DDD5C0;">
+    <div style="padding:10px 12px 10px 0;border-bottom:1px solid #E7E0CD;font-weight:500;">Silhouette générale</div><div style="padding:10px 0;border-bottom:1px solid #E7E0CD;">Deux formes miroir formant une coupe ouverte en « W ». Boîte englobante ≈ 680 × 590 px sur 1024 (66 % × 58 %), ratio 1,15 : 1, centrée (centre ≈ 512, 520).</div>
+    <div style="padding:10px 12px 10px 0;border-bottom:1px solid #E7E0CD;font-weight:500;">Position des mains</div><div style="padding:10px 0;border-bottom:1px solid #E7E0CD;">Levées, évasées vers l'extérieur à mi-hauteur puis refermées vers le haut ; les bouts des doigts pointent vers le centre-haut. Posture de réception, paumes tournées l'une vers l'autre et vers le ciel.</div>
+    <div style="padding:10px 12px 10px 0;border-bottom:1px solid #E7E0CD;font-weight:500;">Symétrie</div><div style="padding:10px 0;border-bottom:1px solid #E7E0CD;">Axiale verticale, quasi parfaite. Dérives de quelques px (génération IA) sur les doigts et les poignets → à reconstruire par miroir strict.</div>
+    <div style="padding:10px 12px 10px 0;border-bottom:1px solid #E7E0CD;font-weight:500;">Doigts</div><div style="padding:10px 0;border-bottom:1px solid #E7E0CD;">Les quatre doigts sont regroupés en une bande unique (≈ 95 px, 14 % de la largeur du symbole), extrémité en demi-cercle. Les doigts intérieurs sont suggérés par un filet crème en boucle (≈ 8 px).</div>
+    <div style="padding:10px 12px 10px 0;border-bottom:1px solid #E7E0CD;font-weight:500;">Pouces</div><div style="padding:10px 0;border-bottom:1px solid #E7E0CD;">Doigt court vertical côté intérieur (≈ 90 × 250 px), bout arrondi, détaché de la bande des doigts par le filet crème. C'est l'élément qui fait lire « main » plutôt que « feuille ».</div>
+    <div style="padding:10px 12px 10px 0;border-bottom:1px solid #E7E0CD;font-weight:500;">Séparation des mains</div><div style="padding:10px 0;border-bottom:1px solid #E7E0CD;">Les paumes se touchent en un point (x = 512, y ≈ 680) et restent jointes jusqu'au poignet. La séparation repose uniquement sur l'échancrure centrale : <strong>point faible n°1</strong>.</div>
+    <div style="padding:10px 12px 10px 0;border-bottom:1px solid #E7E0CD;font-weight:500;">Creux central</div><div style="padding:10px 0;border-bottom:1px solid #E7E0CD;">V arrondi entre les pouces : ≈ 150 px (22 % W) au niveau des bouts des pouces, se refermant en pointe à y ≈ 680.</div>
+    <div style="padding:10px 12px 10px 0;border-bottom:1px solid #E7E0CD;font-weight:500;">Mains / espace négatif</div><div style="padding:10px 0;border-bottom:1px solid #E7E0CD;">Trois vides structurants : trouée haute entre bouts des doigts (≈ 190 px, 28 % W), V central, deux boucles internes fines. Surface verte ≈ 24 % du canvas.</div>
+    <div style="padding:10px 12px 10px 0;border-bottom:1px solid #E7E0CD;font-weight:500;">Couleurs</div><div style="padding:10px 0;border-bottom:1px solid #E7E0CD;">Vert émeraude plat, échantillonné ≈ #137F43. Fond ivoire ≈ #F3ECD5. Aucun dégradé sur les mains ; léger grain sur le fond (artefact, à ne pas reproduire).</div>
+    <div style="padding:10px 12px 10px 0;border-bottom:1px solid #E7E0CD;font-weight:500;">Niveau de détail / style</div><div style="padding:10px 0;border-bottom:1px solid #E7E0CD;">Pictogramme plat monochrome, type découpe papier. Ni contour, ni ombre, ni texture. Bords doux, rayons généreux.</div>
+    <div style="padding:10px 12px 10px 0;border-bottom:1px solid #E7E0CD;font-weight:500;">Artefacts à supprimer</div><div style="padding:10px 0;border-bottom:1px solid #E7E0CD;">Étoile filigrane (bas-droite), petits crochets aux coins des poignets (y ≈ 800), grain du fond, asymétries.</div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:24px;">
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <h3 style="margin:0;font-size:15px;font-weight:600;">Ce qui fait lire « douaa »</h3>
+      <ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px;">
+        <li>Deux lobes symétriques distincts, séparés par le V central.</li>
+        <li>Doigts orientés vers le haut et l'intérieur = geste de demande / réception.</li>
+        <li>Pouces courts détachés : preuve anatomique qu'il s'agit de mains.</li>
+        <li>Aplat unique à fort contraste, aucun élément concurrent.</li>
+      </ol>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <h3 style="margin:0;font-size:15px;font-weight:600;">Risques identifiés</h3>
+      <ul style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px;">
+        <li>Le filet interne (≈ 1,2 % W) tombe sous 1 px dès 96 px : pouce et doigts fusionnent.</li>
+        <li>Paumes jointes : à 32–48 px la forme peut se lire tulipe, couronne ou « W ».</li>
+        <li>Les flancs (r ≈ 340 px du centre) dépassent le cercle de sécurité Android (r ≈ 313 px) → rognage.</li>
+        <li>Crochets du poignet : bruit visuel, lecture « griffes ».</li>
+      </ul>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <h3 style="margin:0;font-size:15px;font-weight:600;">Constat sur l'existant (repo)</h3>
+      <ul style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px;">
+        <li>Mains réalistes ≈ 27 % du canvas, halo doré, texte arabe dans l'icône.</li>
+        <li><code style="font-family:'IBM Plex Mono',monospace;font-size:13px;">adaptive_icon_foreground</code> = l'image pleine carrée : texte et mains rognés par le masque.</li>
+        <li>Splash et icône partagent le même fichier ; iOS non généré (<code style="font-family:'IBM Plex Mono',monospace;font-size:13px;">ios: false</code>).</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:16px;">
+  <h2 style="margin:0;font-size:22px;font-weight:600;display:flex;gap:14px;align-items:baseline;"><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#0F7A45;">02</span>Principes de design retenus</h2>
+  <ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;">
+    <li><strong>Une seule silhouette maîtresse</strong> (vectorielle), dérivée de la référence, utilisée à l'identique partout.</li>
+    <li><strong>Deux mains distinctes</strong> : jamais de fusion. Une fente sépare les paumes jusqu'en bas.</li>
+    <li><strong>Aplat monochrome</strong> vert sur ivoire. Pas de dégradé, d'ombre ni de contour sur le symbole.</li>
+    <li><strong>L'espace négatif est un élément dessiné</strong>, avec des largeurs minimales imposées.</li>
+    <li><strong>Deux niveaux de détail</strong> : « Standard » (≥ 96 px) et « Petite taille » (≤ 64 px), même contour extérieur.</li>
+    <li><strong>Rien d'autre dans l'icône</strong> : ni texte, ni mosquée, ni étoile, ni halo.</li>
+    <li><strong>La plateforme applique le masque</strong> : aucun coin arrondi dans les fichiers.</li>
+  </ol>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:16px;">
+  <h2 style="margin:0;font-size:22px;font-weight:600;display:flex;gap:14px;align-items:baseline;"><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#0F7A45;">03</span>Description précise de la silhouette</h2>
+  <p style="margin:0;color:#3C463F;">Construction de la main gauche ; la main droite est son miroir exact sur l'axe vertical. Unités relatives à W = largeur totale du symbole (deux mains).</p>
+  <div style="display:grid;grid-template-columns:minmax(150px,200px) minmax(0,1fr);border-top:1px solid #DDD5C0;">
+    <div style="padding:10px 12px 10px 0;border-bottom:1px solid #E7E0CD;font-weight:500;">A · Bande des doigts</div><div style="padding:10px 0;border-bottom:1px solid #E7E0CD;">Part du flanc extérieur (point le plus large à mi-hauteur), monte en diagonale à ≈ 55° vers l'intérieur. Largeur constante 0,14 W. Bout en demi-cercle complet (r = 0,07 W). Longueur visible ≈ 0,42 W, jamais plus de 0,48 W (sinon « ailes »).</div>
+    <div style="padding:10px 12px 10px 0;border-bottom:1px solid #E7E0CD;font-weight:500;">B · Pouce</div><div style="padding:10px 0;border-bottom:1px solid #E7E0CD;">Vertical, côté intérieur. Largeur 0,13 W, hauteur libre 0,30 W au-dessus de sa base, bout en demi-cercle. Sommet du pouce à 0,32 H sous le sommet des doigts.</div>
+    <div style="padding:10px 12px 10px 0;border-bottom:1px solid #E7E0CD;font-weight:500;">C · Paume</div><div style="padding:10px 0;border-bottom:1px solid #E7E0CD;">Masse pleine sous pouce et doigts. Bord extérieur convexe continu (flanc → poignet), bord intérieur quasi vertical le long de la fente centrale.</div>
+    <div style="padding:10px 12px 10px 0;border-bottom:1px solid #E7E0CD;font-weight:500;">D · Poignet</div><div style="padding:10px 0;border-bottom:1px solid #E7E0CD;">Coupe basse légèrement concave (flèche 0,02 W), coins arrondis r = 0,03 W. Suppression des crochets de la référence.</div>
+    <div style="padding:10px 12px 10px 0;border-bottom:1px solid #E7E0CD;font-weight:500;">E · Filet interne</div><div style="padding:10px 0;border-bottom:1px solid #E7E0CD;">Évidement qui sépare le pouce de la bande des doigts. Épaisseur portée de 0,012 W à <strong>0,025 W</strong>, extrémités arrondies. Remplacé en version « Petite taille » (voir §11).</div>
+    <div style="padding:10px 12px 10px 0;border-bottom:1px solid #E7E0CD;font-weight:500;">F · Jonction centrale</div><div style="padding:10px 0;border-bottom:1px solid #E7E0CD;">Le V entre les pouces se prolonge en <strong>fente verticale</strong> de 0,03 W jusqu'au poignet (nouveau). Les talons restent proches : on lit « deux mains côte à côte », pas deux objets séparés.</div>
+    <div style="padding:10px 12px 10px 0;border-bottom:1px solid #E7E0CD;font-weight:500;">Point de vigilance</div><div style="padding:10px 0;border-bottom:1px solid #E7E0CD;">Anatomiquement, le doigt court intérieur correspond plutôt au bord de l'auriculaire qu'au pouce. La lecture globale n'en souffre pas : ne pas « corriger » cette disposition, qui est celle de la référence validée.</div>
+  </div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:16px;">
+  <h2 style="margin:0;font-size:22px;font-weight:600;display:flex;gap:14px;align-items:baseline;"><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#0F7A45;">04</span>Palette</h2>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;">
+    <div style="display:flex;flex-direction:column;border:1px solid #DDD5C0;background:#FFFDF7;"><div style="height:72px;background:#0F7A45;"></div><div style="padding:10px 12px;display:flex;flex-direction:column;gap:2px;"><strong style="font-size:14px;">Émeraude Rahma</strong><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;">#0F7A45</span><span style="font-size:13px;color:#5A6259;">Couleur unique des mains. Contraste 4,8 : 1 sur Ivoire.</span></div></div>
+    <div style="display:flex;flex-direction:column;border:1px solid #DDD5C0;background:#FFFDF7;"><div style="height:72px;background:#0A5C34;"></div><div style="padding:10px 12px;display:flex;flex-direction:column;gap:2px;"><strong style="font-size:14px;">Émeraude profond</strong><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;">#0A5C34</span><span style="font-size:13px;color:#5A6259;">Ombre (splash uniquement), fond du mode sombre du logo.</span></div></div>
+    <div style="display:flex;flex-direction:column;border:1px solid #DDD5C0;background:#FFFDF7;"><div style="height:72px;background:#2E9A5F;"></div><div style="padding:10px 12px;display:flex;flex-direction:column;gap:2px;"><strong style="font-size:14px;">Émeraude clair</strong><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;">#2E9A5F</span><span style="font-size:13px;color:#5A6259;">Highlight (splash uniquement). Jamais dans l'icône.</span></div></div>
+    <div style="display:flex;flex-direction:column;border:1px solid #DDD5C0;background:#FFFDF7;"><div style="height:72px;background:#F4EDD8;border-bottom:1px solid #E7E0CD;"></div><div style="padding:10px 12px;display:flex;flex-direction:column;gap:2px;"><strong style="font-size:14px;">Ivoire</strong><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;">#F4EDD8</span><span style="font-size:13px;color:#5A6259;">Fond de l'icône, du splash système et de Play.</span></div></div>
+    <div style="display:flex;flex-direction:column;border:1px solid #DDD5C0;background:#FFFDF7;"><div style="height:72px;background:#FAF6EA;border-bottom:1px solid #E7E0CD;"></div><div style="padding:10px 12px;display:flex;flex-direction:column;gap:2px;"><strong style="font-size:14px;">Ivoire clair</strong><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;">#FAF6EA</span><span style="font-size:13px;color:#5A6259;">Centre du dégradé radial optionnel du fond.</span></div></div>
+    <div style="display:flex;flex-direction:column;border:1px solid #DDD5C0;background:#FFFDF7;"><div style="height:72px;background:#E6EDDA;border-bottom:1px solid #E7E0CD;"></div><div style="padding:10px 12px;display:flex;flex-direction:column;gap:2px;"><strong style="font-size:14px;">Vert pâle</strong><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;">#E6EDDA</span><span style="font-size:13px;color:#5A6259;">Décor du splash (paysage, arcs). Jamais dans l'icône.</span></div></div>
+    <div style="display:flex;flex-direction:column;border:1px solid #DDD5C0;background:#FFFDF7;"><div style="height:72px;background:#B8860B;"></div><div style="padding:10px 12px;display:flex;flex-direction:column;gap:2px;"><strong style="font-size:14px;">Or (existant)</strong><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;">#B8860B</span><span style="font-size:13px;color:#5A6259;">Déjà utilisé dans l'app (motifs). Splash uniquement, en filet fin.</span></div></div>
+  </div>
+  <ul style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px;">
+    <li><strong>Dégradé des mains : aucun.</strong> Fond : dégradé radial facultatif #FAF6EA (centre) → #F4EDD8 (bords), écart imperceptible à 48 px.</li>
+    <li>#0F7A45 est légèrement plus profond que la référence (#137F43) pour gagner du contraste, sans atteindre le vert quasi noir qui écrase les détails.</li>
+    <li>Cohérence avec l'app : les verts existants (#0E7A5B, #006A4E, #1E8449) restent dans la même famille.</li>
+  </ul>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:16px;">
+  <h2 style="margin:0;font-size:22px;font-weight:600;display:flex;gap:14px;align-items:baseline;"><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#0F7A45;">05</span>Proportions et espace négatif</h2>
+  <div style="display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,.8fr) minmax(0,.8fr) minmax(0,.8fr);font-size:14px;border-top:1px solid #DDD5C0;">
+    <div style="padding:8px 8px 8px 0;border-bottom:1px solid #DDD5C0;font-weight:600;">Cote (× W)</div><div style="padding:8px;border-bottom:1px solid #DDD5C0;font-weight:600;">Référence</div><div style="padding:8px;border-bottom:1px solid #DDD5C0;font-weight:600;">Cible</div><div style="padding:8px;border-bottom:1px solid #DDD5C0;font-weight:600;">Minimum</div>
+    <div style="padding:8px 8px 8px 0;border-bottom:1px solid #E7E0CD;">Hauteur H</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;font-family:'IBM Plex Mono',monospace;">0,87</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;font-family:'IBM Plex Mono',monospace;">0,87</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;font-family:'IBM Plex Mono',monospace;">0,82</div>
+    <div style="padding:8px 8px 8px 0;border-bottom:1px solid #E7E0CD;">Largeur bande doigts</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;font-family:'IBM Plex Mono',monospace;">0,14</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;font-family:'IBM Plex Mono',monospace;">0,14</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;font-family:'IBM Plex Mono',monospace;">0,12</div>
+    <div style="padding:8px 8px 8px 0;border-bottom:1px solid #E7E0CD;">Largeur pouce</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;font-family:'IBM Plex Mono',monospace;">0,13</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;font-family:'IBM Plex Mono',monospace;">0,13</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;font-family:'IBM Plex Mono',monospace;">0,11</div>
+    <div style="padding:8px 8px 8px 0;border-bottom:1px solid #E7E0CD;">V central (au bout des pouces)</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;font-family:'IBM Plex Mono',monospace;">0,22</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;font-family:'IBM Plex Mono',monospace;">0,22</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;font-family:'IBM Plex Mono',monospace;">0,18</div>
+    <div style="padding:8px 8px 8px 0;border-bottom:1px solid #E7E0CD;">Trouée entre bouts des doigts</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;font-family:'IBM Plex Mono',monospace;">0,28</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;font-family:'IBM Plex Mono',monospace;">0,28</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;font-family:'IBM Plex Mono',monospace;">0,24</div>
+    <div style="padding:8px 8px 8px 0;border-bottom:1px solid #E7E0CD;">Fente entre les paumes</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;font-family:'IBM Plex Mono',monospace;">0</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;font-family:'IBM Plex Mono',monospace;color:#0F7A45;font-weight:500;">0,03</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;font-family:'IBM Plex Mono',monospace;">0,025</div>
+    <div style="padding:8px 8px 8px 0;border-bottom:1px solid #E7E0CD;">Filet pouce / doigts</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;font-family:'IBM Plex Mono',monospace;">0,012</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;font-family:'IBM Plex Mono',monospace;color:#0F7A45;font-weight:500;">0,025</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;font-family:'IBM Plex Mono',monospace;">0,02</div>
+    <div style="padding:8px 8px 8px 0;border-bottom:1px solid #E7E0CD;">Surface verte / canvas icône</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;font-family:'IBM Plex Mono',monospace;">24 %</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;font-family:'IBM Plex Mono',monospace;">20–24 %</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;font-family:'IBM Plex Mono',monospace;">18 %</div>
+  </div>
+  <p style="margin:0;color:#3C463F;">Règle : à toute taille de rendu, la fente centrale et le V doivent mesurer ≥ 1 px physique. Si ce n'est plus vrai, basculer sur la version « Petite taille ». Tous les éléments internes ont des bouts arrondis ; aucun angle vif sauf la pointe basse du V.</p>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:16px;">
+  <h2 style="margin:0;font-size:22px;font-weight:600;display:flex;gap:14px;align-items:baseline;"><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#0F7A45;">06</span>Safe zones</h2>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;align-items:start;">
+    <figure style="margin:0;display:flex;flex-direction:column;gap:8px;">
+      <div style="position:relative;width:100%;max-width:360px;aspect-ratio:1;">
+        <img src="assets/reference/icone-nb.jpg" alt="" style="width:100%;height:100%;display:block;">
+        <div style="position:absolute;left:16.67%;top:16.67%;width:66.67%;height:66.67%;border:2px dashed #1F2A23;box-sizing:border-box;"></div>
+        <div style="position:absolute;left:19.44%;top:19.44%;width:61.11%;height:61.11%;border:2px solid #C0392B;border-radius:50%;box-sizing:border-box;"></div>
+      </div>
+      <figcaption style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#5A6259;">Référence utilisée telle quelle en foreground 108 dp : pointillé = zone visible 72 dp, rouge = cercle sûr 66 dp. Les flancs sortent du cercle.</figcaption>
+    </figure>
+    <div style="display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);font-size:14px;border-top:1px solid #DDD5C0;">
+      <div style="padding:8px 8px 8px 0;border-bottom:1px solid #DDD5C0;font-weight:600;">Surface</div><div style="padding:8px;border-bottom:1px solid #DDD5C0;font-weight:600;">W / canvas</div>
+      <div style="padding:8px 8px 8px 0;border-bottom:1px solid #E7E0CD;">iOS 1024</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;font-family:'IBM Plex Mono',monospace;">62 %</div>
+      <div style="padding:8px 8px 8px 0;border-bottom:1px solid #E7E0CD;">Play Store 512</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;font-family:'IBM Plex Mono',monospace;">62 %</div>
+      <div style="padding:8px 8px 8px 0;border-bottom:1px solid #E7E0CD;">Android foreground 108 dp</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;font-family:'IBM Plex Mono',monospace;">54 %</div>
+      <div style="padding:8px 8px 8px 0;border-bottom:1px solid #E7E0CD;">Android monochrome 108 dp</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;font-family:'IBM Plex Mono',monospace;">54 %</div>
+      <div style="padding:8px 8px 8px 0;border-bottom:1px solid #E7E0CD;">Splash Android 12 (288 dp)</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;font-family:'IBM Plex Mono',monospace;">52 %</div>
+      <div style="padding:8px 8px 8px 0;border-bottom:1px solid #E7E0CD;">Web maskable 512</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;font-family:'IBM Plex Mono',monospace;">60 %</div>
+      <div style="padding:8px 8px 8px 0;border-bottom:1px solid #E7E0CD;">Logo (zone de protection)</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;font-family:'IBM Plex Mono',monospace;">marge 0,25 W</div>
+    </div>
+  </div>
+  <p style="margin:0;color:#3C463F;">Le symbole est centré sur la boîte englobante, puis remonté de 1 % de la hauteur du canvas (compensation optique : la masse est en bas). À 54 % sur 108 dp, le point le plus éloigné du centre se trouve à ≈ 29 dp : dans le cercle sûr de 33 dp, marge ≈ 4 dp.</p>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:16px;">
+  <h2 style="margin:0;font-size:22px;font-weight:600;display:flex;gap:14px;align-items:baseline;"><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#0F7A45;">07</span>Dimensions et fichiers</h2>
+  <div style="display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr) minmax(0,1.4fr);font-size:14px;border-top:1px solid #DDD5C0;">
+    <div style="padding:8px 8px 8px 0;border-bottom:1px solid #DDD5C0;font-weight:600;">Fichier</div><div style="padding:8px;border-bottom:1px solid #DDD5C0;font-weight:600;">Taille</div><div style="padding:8px;border-bottom:1px solid #DDD5C0;font-weight:600;">Format</div>
+    <div style="padding:8px 8px 8px 0;border-bottom:1px solid #E7E0CD;font-family:'IBM Plex Mono',monospace;font-size:13px;">brand/rahma-hands.svg</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;">vectoriel, artboard 1000 × 870</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;">SVG, 1 tracé par main, aplat #0F7A45</div>
+    <div style="padding:8px 8px 8px 0;border-bottom:1px solid #E7E0CD;font-family:'IBM Plex Mono',monospace;font-size:13px;">brand/rahma-hands-small.svg</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;">idem</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;">SVG, variante ≤ 64 px</div>
+    <div style="padding:8px 8px 8px 0;border-bottom:1px solid #E7E0CD;font-family:'IBM Plex Mono',monospace;font-size:13px;">assets/icon/icon_master.png</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;">1024 × 1024</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;">PNG 24 bits, sRGB, sans alpha, fond #F4EDD8</div>
+    <div style="padding:8px 8px 8px 0;border-bottom:1px solid #E7E0CD;font-family:'IBM Plex Mono',monospace;font-size:13px;">assets/icon/icon_foreground.png</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;">1024 × 1024 (108 dp)</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;">PNG 32 bits, fond transparent</div>
+    <div style="padding:8px 8px 8px 0;border-bottom:1px solid #E7E0CD;font-family:'IBM Plex Mono',monospace;font-size:13px;">assets/icon/icon_monochrome.png</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;">1024 × 1024 (108 dp)</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;">PNG 32 bits, silhouette blanche sur transparent</div>
+    <div style="padding:8px 8px 8px 0;border-bottom:1px solid #E7E0CD;font-family:'IBM Plex Mono',monospace;font-size:13px;">store/play_icon_512.png</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;">512 × 512</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;">PNG 32 bits, sRGB, ≤ 1 Mo, carré plein</div>
+    <div style="padding:8px 8px 8px 0;border-bottom:1px solid #E7E0CD;font-family:'IBM Plex Mono',monospace;font-size:13px;">assets/splash/splash_logo.png</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;">1152 × 1152 (288 dp @4x)</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;">PNG 32 bits, transparent</div>
+    <div style="padding:8px 8px 8px 0;border-bottom:1px solid #E7E0CD;font-family:'IBM Plex Mono',monospace;font-size:13px;">assets/splash/splash_art.png</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;">1440 × 3120</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;">PNG/WebP, écran de marque Flutter</div>
+    <div style="padding:8px 8px 8px 0;border-bottom:1px solid #E7E0CD;font-family:'IBM Plex Mono',monospace;font-size:13px;">brand/logo_{green,ivory}.svg/.png</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;">SVG + PNG 2048 de large</div><div style="padding:8px;border-bottom:1px solid #E7E0CD;">Transparent, sans marge</div>
+  </div>
+  <p style="margin:0;color:#3C463F;">Source de vérité : le SVG. Tous les PNG en sont exportés, jamais recadrés à partir d'un autre PNG. Espace colorimétrique sRGB partout (P3 inutile pour un aplat).</p>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:16px;">
+  <h2 style="margin:0;font-size:22px;font-weight:600;display:flex;gap:14px;align-items:baseline;"><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#0F7A45;">08</span>Android — architecture Adaptive Icon</h2>
+  <div style="display:flex;flex-direction:column;gap:12px;">
+    <h3 style="margin:0;font-size:15px;font-weight:600;">Choix du cadre (question 7)</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;">
+      <div style="border:1px solid #DDD5C0;padding:14px;display:flex;flex-direction:column;gap:6px;background:#FFFDF7;"><strong>A · Coins arrondis intégrés</strong><span style="font-size:14px;">+ Rendu identique partout.<br>− Double arrondi / liseré sur tous les launchers et iOS. Rejeté par Play et Apple.</span><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#8E2B22;">Rejeté</span></div>
+      <div style="border:1px solid #DDD5C0;padding:14px;display:flex;flex-direction:column;gap:6px;background:#FFFDF7;"><strong>B · Carré plein, masque plateforme</strong><span style="font-size:14px;">+ Correct pour iOS et Play.<br>− Sur Android, sans couches séparées : icône « legacy » rétrécie dans un cercle blanc.</span><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#5A6259;">Retenu pour iOS / Play</span></div>
+      <div style="border:2px solid #0F7A45;padding:13px;display:flex;flex-direction:column;gap:6px;background:#FFFDF7;"><strong>C · Adaptive icon (fg / bg / mono)</strong><span style="font-size:14px;">+ Chaque launcher applique son masque (cercle, squircle, goutte), parallaxe, icônes thématiques Android 13+.<br>− Demande de respecter la safe zone.</span><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#0F7A45;">Retenu pour Android</span></div>
+    </div>
+    <p style="margin:0;"><strong>Recommandation :</strong> un seul master carré sans coins (B) pour iOS, Play et legacy Android, plus les couches adaptatives (C) pour Android 8+.</p>
+  </div>
+  <ul style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px;">
+    <li><strong>Background :</strong> couleur unie <code style="font-family:'IBM Plex Mono',monospace;font-size:13px;">#F4EDD8</code> (ressource couleur, pas une image). Remplace l'actuel #0E7A5B.</li>
+    <li><strong>Foreground :</strong> mains seules sur transparent, W = 54 % du canvas 108 dp. Version « Petite taille » du tracé (le rendu launcher fait 48–64 dp).</li>
+    <li><strong>Monochrome (Android 13+) :</strong> même tracé en une couleur, même position. Sans lui, l'icône est exclue des icônes thématiques.</li>
+    <li><strong>Taille de travail :</strong> 1024 × 1024 = 108 dp ; grille : zone visible 72 dp (683 px), cercle sûr 66 dp (626 px).</li>
+    <li><strong>Launcher :</strong> vérifier cercle, squircle, carré arrondi, goutte (Pixel, Samsung One UI, Xiaomi) et les fonds d'écran clair / sombre / photo.</li>
+  </ul>
+  <pre style="margin:0;padding:16px;background:#1F2A23;color:#F4EDD8;font-family:'IBM Plex Mono',monospace;font-size:13px;line-height:1.55;overflow:auto;">flutter_launcher_icons:
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  image_path: "assets/icon/icon_master.png"
+  adaptive_icon_background: "#F4EDD8"
+  adaptive_icon_foreground: "assets/icon/icon_foreground.png"
+  adaptive_icon_monochrome: "assets/icon/icon_monochrome.png"
+  web:
+    generate: true
+    image_path: "assets/icon/icon_master.png"
+    background_color: "#F4EDD8"
+    theme_color: "#0F7A45"</pre>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:16px;">
+  <h2 style="margin:0;font-size:22px;font-weight:600;display:flex;gap:14px;align-items:baseline;"><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#0F7A45;">09</span>iOS</h2>
+  <ul style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px;">
+    <li>Master 1024 × 1024, PNG sRGB <strong>sans canal alpha</strong>, carré plein, <strong>aucun coin arrondi</strong> (le squircle est appliqué par iOS).</li>
+    <li>Composition : fond #F4EDD8 plein, mains W = 62 %, centrées (+1 % optique).</li>
+    <li>iOS 18 : variante <em>Dark</em> (mains #2E9A5F sur fond transparent → iOS pose un fond sombre) et <em>Tinted</em> (silhouette en niveaux de gris). Mêmes tracé et position.</li>
+    <li>Aucun texte, aucune ombre portée, aucun reflet. Le repo génère aujourd'hui <code style="font-family:'IBM Plex Mono',monospace;font-size:13px;">ios: false</code> : à activer.</li>
+  </ul>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:16px;">
+  <h2 style="margin:0;font-size:22px;font-weight:600;display:flex;gap:14px;align-items:baseline;"><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#0F7A45;">10</span>Google Play</h2>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;">
+    <div style="border:1px solid #DDD5C0;padding:14px;display:flex;flex-direction:column;gap:6px;background:#FFFDF7;"><strong>Icône du package (APK / AAB)</strong><span style="font-size:14px;">Celle du launcher : les couches adaptatives (§8) + mipmaps legacy générés depuis le master. Affichée sur l'appareil après installation.</span></div>
+    <div style="border:1px solid #DDD5C0;padding:14px;display:flex;flex-direction:column;gap:6px;background:#FFFDF7;"><strong>Icône de la fiche Store</strong><span style="font-size:14px;">Fichier séparé, téléversé dans la Play Console : 512 × 512, PNG 32 bits, sRGB, ≤ 1 Mo, carré plein opaque. Play applique lui-même arrondi et ombre : ne rien intégrer. Mains W = 62 %.</span></div>
+  </div>
+  <p style="margin:0;color:#3C463F;">Les deux doivent être visuellement identiques ; seule la mise en œuvre diffère. Toute modification de l'une impose la mise à jour de l'autre.</p>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:16px;">
+  <h2 style="margin:0;font-size:22px;font-weight:600;display:flex;gap:14px;align-items:baseline;"><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#0F7A45;">11</span>Spécification A — App Icon</h2>
+  <ul style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px;">
+    <li>Contenu : les deux mains, fond Ivoire. Rien d'autre. Décor : au plus le dégradé radial du fond (§4).</li>
+    <li>Mains : aplat #0F7A45, W selon la surface (§6).</li>
+    <li><strong>Version Standard</strong> (rendus ≥ 96 px, Play, iOS 1024) : filet interne 0,025 W.</li>
+    <li><strong>Version Petite taille</strong> (launcher, mipmaps ≤ mdpi/xhdpi, favicon) : filet interne supprimé ; à la place, une encoche en coin (0,05 W de large à l'ouverture) entaille la paume entre pouce et doigts depuis le V central, pour garder le pouce détaché. Fente centrale portée à 0,04 W. Contour extérieur inchangé.</li>
+  </ul>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:16px;">
+  <h2 style="margin:0;font-size:22px;font-weight:600;display:flex;gap:14px;align-items:baseline;"><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#0F7A45;">12</span>Spécification B — Logo</h2>
+  <ul style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px;">
+    <li>Mains seules, fond transparent, sans bordure, décor ni texte. Tracé Standard.</li>
+    <li>Déclinaisons : Émeraude #0F7A45 (fonds clairs) · Ivoire #F4EDD8 (fonds verts / sombres, p. ex. #0A5C34) · Noir #1F2A23 (impression 1 couleur).</li>
+    <li>Zone de protection : 0,25 W sur les quatre côtés. Taille minimale : 24 px (version Petite taille sous 64 px).</li>
+    <li>Interdits : recolorer en dégradé, contour, ombre, rotation, déformation, placer sur une photo chargée.</li>
+    <li>Lockup (site, partage) : logo + « اللهم ارحم أبي » en Lateef, à droite (RTL), hauteur de texte = 0,35 H, espacement 0,2 W.</li>
+  </ul>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:16px;">
+  <h2 style="margin:0;font-size:22px;font-weight:600;display:flex;gap:14px;align-items:baseline;"><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#0F7A45;">13</span>Spécification C — Splash</h2>
+  <p style="margin:0;padding:14px 16px;background:#E6EDDA;color:#1F2A23;">Contrainte : depuis Android 12, le splash système n'accepte qu'une icône centrée (288 dp, contenu dans un cercle de 192 dp) sur une couleur unie. Paysage, architecture et texte ne peuvent pas y figurer. Le splash se fait donc en deux temps.</p>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;">
+    <div style="border:1px solid #DDD5C0;padding:14px;display:flex;flex-direction:column;gap:6px;background:#FFFDF7;"><strong>C1 · Splash système</strong><span style="font-size:14px;">Fond #F4EDD8, logo Émeraude (splash_logo.png, W = 52 %). Identique à l'icône : transition sans rupture. Mode sombre : fond #0A5C34, logo Ivoire.</span></div>
+    <div style="border:1px solid #DDD5C0;padding:14px;display:flex;flex-direction:column;gap:6px;background:#FFFDF7;"><strong>C2 · Écran de marque Flutter</strong><span style="font-size:14px;">1,2 à 1,8 s, puis fondu vers l'accueil. Mains W = 44 % de la largeur écran, centrées à 42 % de la hauteur. Sous les mains : « اللهم ارحم أبي » en Lateef, #0F7A45, 44 sp. Décor en bas du tiers inférieur : ligne d'horizon et arcs très discrets en #E6EDDA, filet or #B8860B à 40 % d'opacité maximum. Le décor ne dépasse jamais la base des mains.</span></div>
+  </div>
+  <pre style="margin:0;padding:16px;background:#1F2A23;color:#F4EDD8;font-family:'IBM Plex Mono',monospace;font-size:13px;line-height:1.55;overflow:auto;">flutter_native_splash:
+  color: "#F4EDD8"
+  image: assets/splash/splash_logo.png
+  color_dark: "#0A5C34"
+  image_dark: assets/splash/splash_logo_ivory.png
+  android_12:
+    color: "#F4EDD8"
+    image: assets/splash/splash_logo.png
+    color_dark: "#0A5C34"
+    image_dark: assets/splash/splash_logo_ivory.png
+  ios: true</pre>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:16px;">
+  <h2 style="margin:0;font-size:22px;font-weight:600;display:flex;gap:14px;align-items:baseline;"><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#0F7A45;">14</span>Règles de cohérence</h2>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;">
+    <div style="display:flex;flex-direction:column;gap:6px;"><h3 style="margin:0;font-size:15px;font-weight:600;">Strictement identique</h3>
+      <ul style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:3px;"><li>Tracé SVG des mains (même fichier)</li><li>Proportions internes (§5)</li><li>Orientation, symétrie, axe vertical</li><li>Couleur des mains #0F7A45 (ou Ivoire en inversé)</li><li>Aplat sans contour</li><li>Absence d'ombre sur le symbole</li><li>Philosophie : pictogramme plat, sobre</li></ul></div>
+    <div style="display:flex;flex-direction:column;gap:6px;"><h3 style="margin:0;font-size:15px;font-weight:600;">Peut varier</h3>
+      <ul style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:3px;"><li>Arrière-plan (ivoire, transparent, vert profond)</li><li>Décor (splash uniquement)</li><li>Taille du symbole (§6)</li><li>Texte (logo lockup et splash uniquement)</li><li>Niveau de détail : Standard / Petite taille</li></ul></div>
+  </div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:16px;">
+  <h2 style="margin:0;font-size:22px;font-weight:600;display:flex;gap:14px;align-items:baseline;"><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#0F7A45;">15</span>Checklist de validation</h2>
+  <p style="margin:0;color:#3C463F;">Banc de test : référence actuelle rendue aux tailles réelles, dans les masques cercle et squircle, sur le fond choisi dans les Tweaks. À refaire avec chaque version produite.</p>
+  <div style="padding:20px;display:flex;flex-direction:column;gap:20px;background:{{ wallBg }};">
+    <sc-for list="{{ rows }}" as="row" hint-placeholder-count="2">
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:{{ wallInk }};">{{ row.label }}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:22px;align-items:flex-end;">
+          <sc-for list="{{ sizes }}" as="s" hint-placeholder-count="7">
+            <div style="display:flex;flex-direction:column;gap:6px;align-items:center;">
+              <div style="display:flex;gap:8px;align-items:flex-end;">
+                <img src="{{ row.src }}" alt="" style="width:{{ s.px }};height:{{ s.px }};border-radius:50%;object-fit:cover;display:block;">
+                <img src="{{ row.src }}" alt="" style="width:{{ s.px }};height:{{ s.px }};border-radius:23%;object-fit:cover;display:block;">
+              </div>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;white-space:nowrap;color:{{ wallInk }};">{{ s.n }} px</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px;">
+    <div style="display:flex;flex-direction:column;gap:6px;"><h3 style="margin:0;font-size:15px;font-weight:600;">À chaque taille (1024 → 32)</h3>
+      <ul style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:3px;"><li>Voit-on deux mains ?</li><li>Voit-on le geste de douaa ?</li><li>Distingue-t-on gauche / droite ?</li><li>Pouce et doigts restent-ils séparés ?</li><li>Fente et V ≥ 1 px physique ?</li><li>Confusion possible (cœur, feuille, ailes, tulipe, couronne, « W », flamme) ?</li></ul></div>
+    <div style="display:flex;flex-direction:column;gap:6px;"><h3 style="margin:0;font-size:15px;font-weight:600;">Méthode</h3>
+      <ul style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:3px;"><li>Export réel à 1024, 512, 256, 128, 96, 64, 48, 32 (pas un redimensionnement navigateur).</li><li>Test du flou : flou gaussien 2 px à 64 px — la silhouette à deux lobes doit subsister.</li><li>Test en capture d'écran d'un vrai launcher, grille de 20 icônes concurrentes (catégorie Religion).</li><li>Test de 5 s auprès de personnes qui ne connaissent pas l'app : « Que représente cette icône ? » sans indice.</li><li>Si échec à ≤ 48 px : passer à la version Petite taille, élargir fente centrale puis encoche. Ne jamais toucher le contour extérieur.</li></ul></div>
+  </div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:16px;">
+  <h2 style="margin:0;font-size:22px;font-weight:600;display:flex;gap:14px;align-items:baseline;"><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#0F7A45;">16</span>Critères d'acceptation</h2>
+  <ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;">
+    <li><strong>Reconnaissance :</strong> ≥ 8 personnes sur 10, sans indice, répondent « mains / prière / douaa » face à l'icône à 48 px dans une grille launcher.</li>
+    <li><strong>Aucune confusion</strong> avec cœur, feuille, ailes, flamme ou tulipe citée par plus d'une personne sur 10.</li>
+    <li><strong>Deux mains</strong> distinguables jusqu'à 32 px (fente centrale visible).</li>
+    <li><strong>Safe zone :</strong> aucun pixel du symbole hors du cercle de 66 dp dans le foreground ; aucun rognage sur cercle, squircle et goutte.</li>
+    <li><strong>Contraste</strong> mains / fond ≥ 4,5 : 1 (#0F7A45 sur #F4EDD8 : ≈ 4,8 : 1).</li>
+    <li><strong>Fichiers conformes :</strong> iOS sans alpha ni coins ; Play 512 opaque ≤ 1 Mo ; foreground et monochrome transparents ; aucun texte dans l'icône.</li>
+    <li><strong>Cohérence :</strong> icône, logo et splash exportés depuis le même SVG ; différence de tracé nulle (superposition à 100 %).</li>
+    <li><strong>Artefacts :</strong> filigrane, crochets du poignet et asymétries supprimés.</li>
+  </ol>
+</section>
+
+</main>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;wallpaper&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Ivoire&quot;,&quot;Fond d'écran sombre&quot;,&quot;Fond d'écran vert&quot;],&quot;default&quot;:&quot;Fond d'écran sombre&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Banc de test&quot;},&quot;showCurrent&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Banc de test&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const walls = {
+      "Ivoire": ["#F4EDD8", "#3C463F"],
+      "Fond d'écran sombre": ["#15191A", "#C9CFC8"],
+      "Fond d'écran vert": ["#2F5D4A", "#E8EFE6"]
+    };
+    const [wallBg, wallInk] = walls[this.props.wallpaper] || walls["Fond d'écran sombre"];
+    const rows = [{ label: "Référence Nano Banana", src: "assets/reference/icone-nb.jpg" }];
+    if (this.props.showCurrent ?? true) rows.push({ label: "Icône actuelle (comparaison)", src: "assets/icon/app_icon.png" });
+    const sizes = [256, 192, 128, 96, 64, 48, 32].map(n => ({ n, px: n + "px" }));
+    return { wallBg, wallInk, rows, sizes };
+  }
+}
+</script>
+</body>
+</html>
