@@ -76,10 +76,13 @@ class _BannerAdSlotState extends State<BannerAdSlot> {
   Widget build(BuildContext context) {
     final loadedAd = _controller.loadedAd;
 
-    // idle / refused / loading / failed : hauteur nulle, aucun espace
-    // résiduel — seul l'état `loaded` rend un widget de taille non nulle.
+    // idle / refused / loading / failed : aucune bannière, mais l'inset bas
+    // système reste réservé — `Scaffold.bottomNavigationBar` le retire déjà
+    // du `body`, sans quoi la fin des listes passerait derrière la barre de
+    // navigation Android (edge-to-edge). Hauteur = `viewPadding.bottom`
+    // uniquement (0 sans barre système), aucun espace publicitaire résiduel.
     if (_controller.state != BannerAdSlotState.loaded || loadedAd == null) {
-      return const SizedBox.shrink();
+      return const SafeArea(top: false, child: SizedBox(width: double.infinity));
     }
 
     return SafeArea(
