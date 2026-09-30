@@ -82,7 +82,7 @@ Future<void> main() async {
       case 'skip':
       // 👉 Retour visuel clair côté UI (§P1-F : toast DS, plus de SnackBar
       // Material brut) — même message.
-        _showToastFromRoot('تم تجاهل التذكير — نسأل الله أن يرحم والدك.');
+        _showToastFromRoot('تم تجاهل التذكير — نسأل الله أن يرحم موتانا.');
         break;
 
       default: // Tap sur le corps de la notif
@@ -209,7 +209,7 @@ Future<void> _consumePendingNotificationAction() async {
             ?.pushNamedAndRemoveUntil('/home', (route) => false);
         break;
       case 'skip':
-        _showToastFromRoot('نسأل الله أن يرحم والدك… سنذكّرك لاحقًا إن شاء الله.');
+        _showToastFromRoot('نسأل الله أن يرحم موتانا… سنذكّرك لاحقًا إن شاء الله.');
         break;
       default:
         navigatorKey.currentState

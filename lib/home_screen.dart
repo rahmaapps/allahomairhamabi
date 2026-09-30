@@ -7,6 +7,7 @@ import 'package:flutter/services.dart'; // Clipboard + Haptics
 import 'package:flutter/rendering.dart'; // RenderRepaintBoundary
 import 'package:share_plus/share_plus.dart';
 
+import 'app_branding.dart';
 import 'dua_repository.dart';
 import 'models/dua.dart';
 import 'monetization/interstitial_ad_controller.dart';
@@ -59,8 +60,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   String? _emptyStateMessage;
 
   //Suffixe des textes copiés ou partagés
-  static const String _ATTR_SUFFIX_AR =
-      '\n\n— من تطبيق اللَّهُمَّ ارْحَمْ أَبِي —';
+  static const String _ATTR_SUFFIX_AR = AppBranding.shareAttributionSuffix;
 
   // ===== Filtres =====
   // زيارة القبر a son propre écran dédié (LOT 3.F) — plus jamais atteint via
@@ -1384,7 +1384,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         children: [
           Scaffold(
             appBar: AppTopBar(
-              title: 'اللَّهُمَّ ارْحَمْ أَبِي',
+              title: AppBranding.appName,
               height: 56,
               titleStyle:
                   AppTypography.display.copyWith(fontSize: 25, color: appBarForeground),

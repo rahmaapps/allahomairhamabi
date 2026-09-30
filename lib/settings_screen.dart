@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'app_branding.dart';
 import 'monetization/ad_free_hour_entry.dart';
 import 'monetization/privacy_options_entry.dart';
 import 'monetization/rewarded_wording.dart';
@@ -28,22 +29,23 @@ import 'widgets/rewarded_confirmation_sheet.dart';
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
+  /// Texte de partage validé (LOT 3.O — « مشاركة التطبيق »). Mécanisme natif
+  /// uniquement (`Share.share`), aucune logique spécifique à une app tierce
+  /// (remplace l'ancienne intégration WhatsApp de `home_screen.dart`,
+  /// supprimée par ce lot). Exposé pour `test/app_branding_test.dart`.
+  @visibleForTesting
+  static const shareAppText =
+      '${AppBranding.appName}\n'
+      '${AppBranding.descriptor} 🤍\n'
+      '\n'
+      'شارك الأجر مع من تحب:\n'
+      'https://play.google.com/store/apps/details?id=com.joumane.allahomairhamabi';
+
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  /// Texte de partage validé (LOT 3.O — « مشاركة التطبيق »). Mécanisme natif
-  /// uniquement (`Share.share`), aucune logique spécifique à une app tierce
-  /// (remplace l'ancienne intégration WhatsApp de `home_screen.dart`,
-  /// supprimée par ce lot).
-  static const _shareAppText =
-      'اللَّهُمَّ ارْحَمْ أَبِي\n'
-      'تطبيق أدعية لوالدي الميت 🤍\n'
-      '\n'
-      'شارك الأجر مع من تحب:\n'
-      'https://play.google.com/store/apps/details?id=com.joumane.allahomairhamabi';
-
   String _selectedTheme = 'system';
 
   bool _enableMorning = true;
@@ -278,7 +280,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   /// dou'a — `home_screen.dart`, `dua_read_screen.dart`), aucune dépendance
   /// nouvelle, aucune logique propre à une app tierce.
   Future<void> _shareApp() async {
-    await Share.share(_shareAppText);
+    await Share.share(SettingsScreen.shareAppText);
   }
 
   /// « خيارات الخصوصية » (LOT 5.E) — ouvre le formulaire UMP d'options de

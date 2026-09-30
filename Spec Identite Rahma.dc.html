@@ -19,9 +19,9 @@ a{color:#0F7A45;}a:hover{color:#0A5C34;}
 <main style="max-width:940px;margin:0 auto;padding:56px 28px 96px;font-family:'IBM Plex Sans',sans-serif;font-size:15px;line-height:1.6;display:flex;flex-direction:column;gap:56px;">
 
 <header style="display:flex;flex-direction:column;gap:14px;border-bottom:1px solid #DDD5C0;padding-bottom:32px;">
-  <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#5A6259;">Rahma · Spécification identité v1.0 · 28/09/2026</div>
+  <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#5A6259;">Rahma · Spécification identité v1.1 · 30/09/2026 (nom : LOT RENAMING)</div>
   <h1 style="margin:0;font-size:36px;line-height:1.15;font-weight:600;letter-spacing:-.01em;text-wrap:balance;">Icône, logo et splash — analyse de la référence et spécification</h1>
-  <div style="font-family:'Lateef',serif;font-size:40px;line-height:1.2;color:#0F7A45;direction:rtl;text-align:right;">اللهم ارحم أبي</div>
+  <div style="font-family:'Lateef',serif;font-size:40px;line-height:1.2;color:#0F7A45;direction:rtl;text-align:right;">اللهم ارحم أحبّتي</div>
   <p style="margin:0;max-width:680px;color:#3C463F;text-wrap:pretty;">Critère n°1 : un nouvel utilisateur comprend immédiatement « deux mains levées pour faire une douaa ». Aucune nouvelle métaphore : la silhouette de la référence est conservée, puis corrigée pour la lisibilité et les contraintes des plateformes.</p>
 </header>
 
@@ -254,7 +254,7 @@ a{color:#0F7A45;}a:hover{color:#0A5C34;}
     <li>Déclinaisons : Émeraude #0F7A45 (fonds clairs) · Ivoire #F4EDD8 (fonds verts / sombres, p. ex. #0A5C34) · Noir #1F2A23 (impression 1 couleur).</li>
     <li>Zone de protection : 0,25 W sur les quatre côtés. Taille minimale : 24 px (version Petite taille sous 64 px).</li>
     <li>Interdits : recolorer en dégradé, contour, ombre, rotation, déformation, placer sur une photo chargée.</li>
-    <li>Lockup (site, partage) : logo + « اللهم ارحم أبي » en Lateef, à droite (RTL), hauteur de texte = 0,35 H, espacement 0,2 W.</li>
+    <li>Lockup (site, partage) : logo + « اللهم ارحم أحبّتي » en Lateef, à droite (RTL), hauteur de texte = 0,35 H, espacement 0,2 W.</li>
   </ul>
 </section>
 
@@ -263,7 +263,7 @@ a{color:#0F7A45;}a:hover{color:#0A5C34;}
   <p style="margin:0;padding:14px 16px;background:#E6EDDA;color:#1F2A23;">Contrainte : depuis Android 12, le splash système n'accepte qu'une icône centrée (288 dp, contenu dans un cercle de 192 dp) sur une couleur unie. Paysage, architecture et texte ne peuvent pas y figurer. Le splash se fait donc en deux temps.</p>
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;">
     <div style="border:1px solid #DDD5C0;padding:14px;display:flex;flex-direction:column;gap:6px;background:#FFFDF7;"><strong>C1 · Splash système</strong><span style="font-size:14px;">Fond #F4EDD8, logo Émeraude (splash_logo.png, W = 52 %). Identique à l'icône : transition sans rupture. Mode sombre : fond #0A5C34, logo Ivoire.</span></div>
-    <div style="border:1px solid #DDD5C0;padding:14px;display:flex;flex-direction:column;gap:6px;background:#FFFDF7;"><strong>C2 · Écran de marque Flutter</strong><span style="font-size:14px;">1,2 à 1,8 s, puis fondu vers l'accueil. Mains W = 44 % de la largeur écran, centrées à 42 % de la hauteur. Sous les mains : « اللهم ارحم أبي » en Lateef, #0F7A45, 44 sp. Décor en bas du tiers inférieur : ligne d'horizon et arcs très discrets en #E6EDDA, filet or #B8860B à 40 % d'opacité maximum. Le décor ne dépasse jamais la base des mains.</span></div>
+    <div style="border:1px solid #DDD5C0;padding:14px;display:flex;flex-direction:column;gap:6px;background:#FFFDF7;"><strong>C2 · Écran de marque Flutter</strong><span style="font-size:14px;">1,2 à 1,8 s, puis fondu vers l'accueil. Mains W = 44 % de la largeur écran, centrées à 42 % de la hauteur. Sous les mains : « اللهم ارحم أحبّتي » en Lateef, #0F7A45, 44 sp. Décor en bas du tiers inférieur : ligne d'horizon et arcs très discrets en #E6EDDA, filet or #B8860B à 40 % d'opacité maximum. Le décor ne dépasse jamais la base des mains.</span></div>
   </div>
   <pre style="margin:0;padding:16px;background:#1F2A23;color:#F4EDD8;font-family:'IBM Plex Mono',monospace;font-size:13px;line-height:1.55;overflow:auto;">flutter_native_splash:
   color: "#F4EDD8"

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // Clipboard, Haptics
 import 'package:share_plus/share_plus.dart';
 
+import '../app_branding.dart';
 import '../dua_repository.dart';
 import '../models/dua.dart';
 import '../theme/app_colors.dart';
@@ -36,9 +37,8 @@ class _DuaReadScreenState extends State<DuaReadScreen>
     with SingleTickerProviderStateMixin {
   final _repo = DuaRepository();
 
-  // Même suffixe que HOME/Favoris — dupliqué localement (même motif déjà
-  // en place dans le projet, aucune constante partagée existante).
-  static const String _attrSuffix = '\n\n— من تطبيق اللَّهُمَّ ارْحَمْ أَبِي —';
+  // Même suffixe que HOME — source unique : `AppBranding`.
+  static const String _attrSuffix = AppBranding.shareAttributionSuffix;
 
   // Un seul Future pour tout l'écran (§B.8) — douʿā et statut favori
   // chargés ensemble, un seul FutureBuilder consomme le résultat.

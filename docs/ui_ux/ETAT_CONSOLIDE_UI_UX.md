@@ -1,6 +1,6 @@
 # État consolidé du travail UI/UX — document de continuité
 
-**Application :** اللَّهُمَّ ارْحَمْ أَبِي (Flutter, RTL, arabe)
+**Application :** اللهم ارحم أحبّتي — دعاء للميت (Flutter, RTL, arabe). Ancien nom jusqu'au LOT RENAMING (30/09/2026) : اللَّهُمَّ ارْحَمْ أَبِي.
 **Dépôt :** rahmaapps/allahomairhamabi — branche `github-migration` (remote `github-app`)
 **Date de consolidation initiale :** 2 septembre 2026
 **Dernière synchronisation avec le code réel :** 9 septembre 2026 (LOT 3.N)
@@ -47,7 +47,7 @@ Pas de barre de navigation persistante. Le HOME reste le hub ; les destinations 
 **AppBar du HOME, ordre définitif (flux RTL) :**
 
 ```
-اللهم ارحم أبي        ⌕    ♡    ⤴    ⋮
+اللهم ارحم أحبّتي     ⌕    ♡    ⤴    ⋮
                    بحث  مفضلة  partage  menu
 ```
 
@@ -93,7 +93,7 @@ HOME (hub, non scrollable)
 ### Structure verticale — 6 strates, dont 4 seulement dans le `body`
 
 ```
-AppBar 56 dp        اللهم ارحم أبي   ⌕ ♡ ⤴ ⋮        hors body
+AppBar 56 dp        اللهم ارحم أحبّتي ⌕ ♡ ⤴ ⋮        hors body
 bottom: 44 dp       دعاء زيارة القبر · للقراءة عند الزيارة  ‹   hors body
 ────────────────────── padding 16 ──────────────────────
 Chips catégories    44 dp                              N2
@@ -271,7 +271,7 @@ Hauteur 48 · rayon 12 · Plex 16/600 · pressé = couleur pressée **+ `scale .
 
 | Zone | Contenu |
 |---|---|
-| **A — Identité** | HOME : `اللهم ارحم أبي` Lateef 25 `onPrimary`. Écrans secondaires : `→` + titre Plex 16/600, h 52. |
+| **A — Identité** | HOME : `اللهم ارحم أحبّتي` (`AppBranding.appName`) Lateef 25 `onPrimary`. Écrans secondaires : `→` + titre Plex 16/600, h 52. |
 | **B — Actions** | `⌕` · `♡` · `⤴` · `⋮`. Icônes 24 px, zone 48. |
 | **C — `bottom:`** | Bandeau visite — **HOME uniquement**, h 44. |
 
@@ -498,12 +498,12 @@ Aucun prototype interactif n'a été produit. Les trois animations signalées «
 
 Ne pas rouvrir lors de l'implémentation :
 
-1. **L'application reste « اللَّهُمَّ ارْحَمْ أَبِي ».** Elle permet néanmoins plusieurs proches décédés et 11 `PersonType` — décision produit non remise en cause.
+1. **L'application s'appelle désormais « اللهم ارحم أحبّتي »** (descripteur : « دعاء للميت ») — décision produit du LOT RENAMING (30/09/2026), qui remplace l'ancienne décision « L'application reste « اللَّهُمَّ ارْحَمْ أَبِي » ». Le nom global est l'identité de l'application ; la personnalisation par proche (11 `PersonType`, `DuaPersonalizer`) reste inchangée et continue de produire « اللهم ارحم أبي / أمي … » dans le texte des douʿās. Identifiants techniques (`com.joumane.allahomairhamabi`, URL `/allahomairhamabi/`) inchangés.
 2. **Aucune refonte générique.** Toutes les phases appliquent les tokens de la Phase 2 sans en inventer. Plusieurs phases sont explicitement « aucun composant nouveau ».
 3. **Fonctionnalités Flutter existantes préservées.** L'architecture de données, les 48 tests et l'architecture de rendu Premium de la Phase 11 (`duaTextZone`, `duaTextColor`, `fitSinglePage()`, `ClipRect`) sont **conservés**.
 4. **« دعاء زيارة القبر » n'est pas une catégorie ordinaire** : bandeau nommé + écran plein, jamais une chip, jamais un onglet.
 5. **Son mode de lecture spécifique est préservé** : lecture intégrale, scroll vertical interne, **aucune action** (ni copie, ni partage, ni favori, ni « دعاء آخر »). Ne pas les réintroduire au motif que les autres écrans les ont.
-6. **Les 3 templates Premium ne sont pas redessinés.** Dark Luxe en particulier. Seule leur intégration UX est spécifiée ; les vignettes sont des aperçus du rendu existant.
+6. **Les 3 templates Premium ne sont pas redessinés.** Dark Luxe en particulier. Seule leur intégration UX est spécifiée ; les vignettes sont des aperçus du rendu existant. Exception LOT RENAMING : seuls le titre, le sous-titre (« دعاء للميت ») et le footer imprimés dans les PNG ont été remplacés par le nouveau nom ; décor, dimensions et `duaTextZone` inchangés.
 7. **Une seule image générée lors du partage**, via le mécanisme natif de la plateforme. Aucun écran, dialogue ou animation ajouté ; retour sans perte d'état.
 8. **`e2` reste le privilège du contenu sacré.** Aucun autre écran ne l'emprunte.
 9. **Lateef est réservé au sacré** (+ titre de l'app + heures). Aucune troisième police.
