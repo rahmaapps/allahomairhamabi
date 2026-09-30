@@ -29,7 +29,7 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^6.0.0
   flutter_native_splash: ^2.4.0
-  flutter_launcher_icons: ^0.13.1
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true
@@ -39,8 +39,6 @@ flutter:
     - assets/premium/previews/dark_luxe_thumb.png
     - assets/premium/previews/emerald_thumb.png
     - assets/premium/previews/white_elegant_thumb.png
-    - assets/splash/splash_icon.png
-    - assets/icon/app_icon.png
     - assets/premium/templates/dark_luxe.png
     - assets/premium/templates/emerald.png
     - assets/premium/templates/white_elegant.png
@@ -60,22 +58,38 @@ flutter:
           weight: 600
 
 
+# Splash système (spec identité §13 C1). Sources verrouillées (commit d90fdc2) :
+# splash_logo*.png = 1152x1152, mains W 52 %, tenant dans le cercle de 768 px
+# exigé par Android 12+. Régénérer : dart run flutter_native_splash:create
 flutter_native_splash:
-  color: "#FFFBF1"
-  color_dark: "#16211C"
-  image: assets/splash/splash_icon.png
-  image_dark: assets/splash/splash_icon_dark.png
+  color: "#F4EDD8"
+  image: assets/splash/splash_logo.png
+  color_dark: "#0A5C34"
+  image_dark: assets/splash/splash_logo_ivory.png
   android: true
-  ios: false
+  ios: true
   web: false
   android_12:
-    color: "#FFFBF1"
-    color_dark: "#16211C"
-    # 1152x1152, signe dans le cercle central de 768 px (zone visible Android 12+)
-    image: assets/splash/splash_android12.png
-    image_dark: assets/splash/splash_android12_dark.png
+    color: "#F4EDD8"
+    image: assets/splash/splash_logo.png
+    color_dark: "#0A5C34"
+    image_dark: assets/splash/splash_logo_ivory.png
 
-# Launcher icons Android : ressources P2-H gérées manuellement (adaptive
-# foreground/monochrome vectoriels + mipmaps legacy, source
-# assets/icon/app-icon-hands-light.svg). Ne pas relancer flutter_launcher_icons.
+# Icônes launcher Android (legacy + adaptive + monochrome) et AppIcon iOS,
+# générées depuis les PNG verrouillés (commit d90fdc2), à utiliser tels quels.
+# Les calques adaptive sont déjà calibrés (mains W 54 % du canvas 108 dp, dans
+# le cercle sûr 66 dp) : l'inset doit rester à 0, sinon le générateur réduit
+# le symbole de 16 % par côté. Régénérer : dart run flutter_launcher_icons
+# puis `git checkout -- ios/Runner.xcodeproj/project.pbxproj` : la v0.14.4
+# réécrit à tort ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS
+# (le nom d'icône « AppIcon » y est déjà configuré, aucun changement requis).
+flutter_launcher_icons:
+  image_path: assets/icon/icon_master.png
+  android: true
+  adaptive_icon_background: "#F4EDD8"
+  adaptive_icon_foreground: assets/icon/icon_foreground.png
+  adaptive_icon_monochrome: assets/icon/icon_monochrome.png
+  adaptive_icon_foreground_inset: 0
+  ios: true
+  remove_alpha_ios: true
 
