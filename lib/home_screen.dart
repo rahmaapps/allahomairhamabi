@@ -446,6 +446,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void _openTemplatePicker() {
     final cs = Theme.of(context).colorScheme;
 
+    // État de la feuille : déclaré ICI, une seule fois par ouverture — PAS
+    // dans le `builder` de `showModalBottomSheet`, que Flutter peut
+    // réévaluer (constaté au retour d'un Rewarded plein écran), ce qui
+    // recréait ces variables à leur valeur initiale pendant un partage en
+    // cours ; ni dans le builder de `StatefulBuilder` ci-dessous, qui se
+    // ré-exécute à chaque `setSheetState`.
+    bool busy = false;
+    bool showPreparingLabel = false;
+    // LOT 5.G.B — Rewarded en chargement/présentation (B6).
+    bool loadingAd = false;
+    String? errorMessage;
+    Timer? prepTimer;
+
     showModalBottomSheet(
       context: context,
       useSafeArea: true,
@@ -458,17 +471,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadii.hero)),
       ),
       builder: (sheetContext) {
-        // Déclarées ici (portée du builder de la feuille, exécuté une
-        // seule fois à l'ouverture) — PAS dans le builder de
-        // `StatefulBuilder` ci-dessous, qui se ré-exécute à chaque
-        // `setSheetState` et réinitialiserait ces variables sinon.
-        bool busy = false;
-        bool showPreparingLabel = false;
-        // LOT 5.G.B — Rewarded en chargement/présentation (B6).
-        bool loadingAd = false;
-        String? errorMessage;
-        Timer? prepTimer;
-
         return StatefulBuilder(
           builder: (context, setSheetState) {
             // Sélection seule : persiste le template (§4 : « Persistée
@@ -507,6 +509,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 });
               }
 
+              // Vrai dès que ce partage passe par un Rewarded (phase
+              // `loadingAd`) — local à cet appui. Au retour de l'annonce,
+              // « جارٍ التحضير… » s'affiche alors immédiatement, sans le
+              // délai de 400 ms : le rendu lourd qui suit pouvait sinon le
+              // masquer jusqu'à la fin. Parcours sans annonce inchangé.
+              var adShown = false;
+
               final result = await _shareAsImageFlow.run(
                 confirm: () => showRewardedConfirmation(sheetContext),
                 render: _renderPremiumPng,
@@ -517,7 +526,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   }
                 },
                 onPhase: (phase) {
+                  if (phase == ShareAsImagePhase.loadingAd) adShown = true;
                   if (!sheetContext.mounted) return;
+                  if (phase == ShareAsImagePhase.preparingImage && adShown) {
+                    prepTimer?.cancel();
+                    setSheetState(() {
+                      loadingAd = false;
+                      showPreparingLabel = true;
+                    });
+                    return;
+                  }
                   setSheetState(
                     () => loadingAd = phase == ShareAsImagePhase.loadingAd,
                   );
