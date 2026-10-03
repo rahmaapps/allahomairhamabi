@@ -27,8 +27,8 @@ class UserPrefs {
   // -----------------------------
   // Switchs (nous conservons les clés existantes de ton fichier)
   static const _kEnableMorning = 'enableMorning';
-  static const _kEnableAfternoon = 'enableAfternoon';
   static const _kEnableEvening = 'enableEvening';
+  static const _kEnableFriday = 'enableFriday';
 
   static Future<void> saveFavoriteText(int id, String text) async {
     final prefs = await SharedPreferences.getInstance();
@@ -40,13 +40,16 @@ class UserPrefs {
     return prefs.getString('fav_text_$id');
   }
 
-  // Heures/Horaires
+  // Heures/Horaires — les 3 rappels (صباح/مساء/جمعة) ont chacun une heure
+  // configurable et persistée séparément. Défauts alignés sur les anciennes
+  // heures fixes (9:00 / 20:00 / 9:00) pour préserver le comportement des
+  // utilisateurs existants n'ayant jamais rien persisté pour مساء/جمعة.
   static const _kMorningHour = 'morningHour';
   static const _kMorningMinute = 'morningMinute';
-  static const _kAfternoonHour = 'afternoonHour';
-  static const _kAfternoonMinute = 'afternoonMinute';
   static const _kEveningHour = 'eveningHour';
   static const _kEveningMinute = 'eveningMinute';
+  static const _kFridayHour = 'fridayHour';
+  static const _kFridayMinute = 'fridayMinute';
 
   // Filtre longueur
   static const _kLengthFilter = 'length_filter'; // (déjà utilisée)
@@ -56,6 +59,30 @@ class UserPrefs {
 
   // Thème
   static const _kThemeMode = 'theme_mode'; // "light" | "dark" | "system"
+
+  // Monétisation — suppression temporaire des publicités (LOT 5.A socle ;
+  // affichage réel des publicités et déclenchement Rewarded hors périmètre).
+  static const _kAdsSuppressedUntil = 'ads_suppressed_until';
+
+  // Monétisation — dernier interstitiel effectivement présenté (LOT 5.C).
+  // Concept DISTINCT de `_kAdsSuppressedUntil` : espacement entre deux
+  // interstitiels, pas fenêtre « sans publicité » accordée par un Rewarded.
+  static const _kLastInterstitialShownAt = 'last_interstitial_shown_at';
+
+  // Monétisation — autorisation one-shot de Partage comme image gagnée par
+  // un Rewarded (LOT 5.G.A). État présent/absent, jamais un compteur :
+  // 1 Rewarded = 1 partage (B4).
+  static const _kShareAsImageUnlockPending = 'share_as_image_unlock_pending';
+
+  // Évaluation de l'application (LOT 5.D) — date du tout premier usage,
+  // écrite UNE SEULE FOIS. Concept distinct de `settings_completed` (fin
+  // d'onboarding, progression fonctionnelle) : mesure uniquement
+  // l'ancienneté de l'installation. Aucun compteur d'ouvertures, de
+  // sessions ni de douʿās n'en est dérivé (décision produit D2).
+  static const _kFirstOpenAt = 'first_open_at';
+
+  // Évaluation de l'application (LOT 5.D) — dernière sollicitation émise.
+  static const _kLastReviewPromptedAt = 'last_review_prompted_at';
 
   // ============================================================
   // 🔔 NOTIFICATIONS — SWITCHS
@@ -70,16 +97,6 @@ class UserPrefs {
     await sp.setBool(_kEnableMorning, v);
   }
 
-  Future<bool> getAfternoonEnabled() async {
-    final sp = await _prefs();
-    return sp.getBool(_kEnableAfternoon) ?? true;
-  }
-
-  Future<void> setAfternoonEnabled(bool v) async {
-    final sp = await _prefs();
-    await sp.setBool(_kEnableAfternoon, v);
-  }
-
   Future<bool> getEveningEnabled() async {
     final sp = await _prefs();
     return sp.getBool(_kEnableEvening) ?? true;
@@ -90,12 +107,22 @@ class UserPrefs {
     await sp.setBool(_kEnableEvening, v);
   }
 
+  /// LOT 3.G — nouveau rappel, absent avant ce lot : défaut `false` pour ne
+  /// jamais activer silencieusement une notification supplémentaire chez un
+  /// utilisateur existant qui ne l'a jamais demandée.
+  Future<bool> getFridayEnabled() async {
+    final sp = await _prefs();
+    return sp.getBool(_kEnableFriday) ?? false;
+  }
+
+  Future<void> setFridayEnabled(bool v) async {
+    final sp = await _prefs();
+    await sp.setBool(_kEnableFriday, v);
+  }
+
   // ---- Alias backward-compat (ton ancien naming) ----
   Future<void> setEnableMorning(bool v) => setMorningEnabled(v);
   Future<bool> getEnableMorning() => getMorningEnabled();
-
-  Future<void> setEnableAfternoon(bool v) => setAfternoonEnabled(v);
-  Future<bool> getEnableAfternoon() => getAfternoonEnabled();
 
   Future<void> setEnableEvening(bool v) => setEveningEnabled(v);
   Future<bool> getEnableEvening() => getEveningEnabled();
@@ -116,19 +143,6 @@ class UserPrefs {
     return TimeOfDay(hour: h, minute: m);
   }
 
-  Future<void> setAfternoonTime(TimeOfDay t) async {
-    final sp = await _prefs();
-    await sp.setInt(_kAfternoonHour, t.hour);
-    await sp.setInt(_kAfternoonMinute, t.minute);
-  }
-
-  Future<TimeOfDay> getAfternoonTime() async {
-    final sp = await _prefs();
-    final h = sp.getInt(_kAfternoonHour) ?? 15;
-    final m = sp.getInt(_kAfternoonMinute) ?? 0;
-    return TimeOfDay(hour: h, minute: m);
-  }
-
   Future<void> setEveningTime(TimeOfDay t) async {
     final sp = await _prefs();
     await sp.setInt(_kEveningHour, t.hour);
@@ -139,6 +153,19 @@ class UserPrefs {
     final sp = await _prefs();
     final h = sp.getInt(_kEveningHour) ?? 20;
     final m = sp.getInt(_kEveningMinute) ?? 0;
+    return TimeOfDay(hour: h, minute: m);
+  }
+
+  Future<void> setFridayTime(TimeOfDay t) async {
+    final sp = await _prefs();
+    await sp.setInt(_kFridayHour, t.hour);
+    await sp.setInt(_kFridayMinute, t.minute);
+  }
+
+  Future<TimeOfDay> getFridayTime() async {
+    final sp = await _prefs();
+    final h = sp.getInt(_kFridayHour) ?? 9;
+    final m = sp.getInt(_kFridayMinute) ?? 0;
     return TimeOfDay(hour: h, minute: m);
   }
 
@@ -153,6 +180,24 @@ class UserPrefs {
   Future<String> getLengthFilter() async {
     final sp = await _prefs();
     return sp.getString(_kLengthFilter) ?? 'all';
+  }
+
+  // ============================================================
+  // 🖼️ PARTAGE PREMIUM — template sélectionné (§4 Partage Premium :
+  // « Persistée (share_template) »). Stocke le nom de l'enum
+  // (`PremiumTemplate.name`, ex. "darkLuxe") ; `null` si jamais choisi —
+  // à l'appelant de retomber sur Dark Luxe par défaut dans ce cas.
+  // ============================================================
+  static const _kShareTemplate = 'share_template';
+
+  Future<String?> getShareTemplate() async {
+    final sp = await _prefs();
+    return sp.getString(_kShareTemplate);
+  }
+
+  Future<void> setShareTemplate(String templateName) async {
+    final sp = await _prefs();
+    await sp.setString(_kShareTemplate, templateName);
   }
 
   // ============================================================
@@ -209,6 +254,128 @@ class UserPrefs {
     return sp.getString(_kThemeMode) ?? 'system';
   }
 
+  // ============================================================
+  // 🚫 MONÉTISATION — suppression temporaire des publicités
+  // ============================================================
+  /// `null` = aucune suppression temporaire active (jamais accordée, ou
+  /// expirée). Stockée en `millisecondsSinceEpoch` — persistante entre les
+  /// sessions, comme l'exige le socle LOT 5.A.
+  Future<DateTime?> getAdsSuppressedUntil() async {
+    final sp = await _prefs();
+    final millis = sp.getInt(_kAdsSuppressedUntil);
+    if (millis == null) return null;
+    return DateTime.fromMillisecondsSinceEpoch(millis);
+  }
+
+  /// `null` efface la suppression (ex. après expiration constatée par
+  /// l'appelant) ; une valeur non-nulle la (re)définit.
+  Future<void> setAdsSuppressedUntil(DateTime? until) async {
+    final sp = await _prefs();
+    if (until == null) {
+      await sp.remove(_kAdsSuppressedUntil);
+    } else {
+      await sp.setInt(_kAdsSuppressedUntil, until.millisecondsSinceEpoch);
+    }
+  }
+
+  // ============================================================
+  // 🎁 MONÉTISATION — autorisation de Partage comme image (LOT 5.G.A)
+  // ============================================================
+  /// `true` si une autorisation gagnée par Rewarded n'a pas encore été
+  /// consommée. Persistée entre les sessions.
+  Future<bool> getShareAsImageUnlockPending() async {
+    final sp = await _prefs();
+    return sp.getBool(_kShareAsImageUnlockPending) ?? false;
+  }
+
+  /// `false` retire la clé (aucune autorisation en attente).
+  Future<void> setShareAsImageUnlockPending(bool pending) async {
+    final sp = await _prefs();
+    if (pending) {
+      await sp.setBool(_kShareAsImageUnlockPending, true);
+    } else {
+      await sp.remove(_kShareAsImageUnlockPending);
+    }
+  }
+
+  // ============================================================
+  // ⏳ MONÉTISATION — cooldown interstitiel (LOT 5.C)
+  // ============================================================
+  /// Instant de la dernière présentation **effective** d'un interstitiel,
+  /// ou `null` si aucun n'a jamais été présenté. Persistant entre les
+  /// sessions : le cooldown de 10 minutes survit à un redémarrage de l'app.
+  Future<DateTime?> getLastInterstitialShownAt() async {
+    final sp = await _prefs();
+    final millis = sp.getInt(_kLastInterstitialShownAt);
+    if (millis == null) return null;
+    return DateTime.fromMillisecondsSinceEpoch(millis);
+  }
+
+  /// `null` réinitialise le cooldown (aucun interstitiel présenté connu).
+  Future<void> setLastInterstitialShownAt(DateTime? shownAt) async {
+    final sp = await _prefs();
+    if (shownAt == null) {
+      await sp.remove(_kLastInterstitialShownAt);
+    } else {
+      await sp.setInt(_kLastInterstitialShownAt, shownAt.millisecondsSinceEpoch);
+    }
+  }
+
+  // ============================================================
+  // ⭐ ÉVALUATION DE L'APPLICATION (LOT 5.D)
+  // ============================================================
+  /// Date du tout premier usage, ou `null` si jamais enregistrée. Sert
+  /// uniquement au critère d'ancienneté (≥ 7 jours) avant une éventuelle
+  /// demande d'évaluation. Stockée en `millisecondsSinceEpoch`, comme les
+  /// autres dates de ce fichier.
+  Future<DateTime?> getFirstOpenAt() async {
+    final sp = await _prefs();
+    final millis = sp.getInt(_kFirstOpenAt);
+    if (millis == null) return null;
+    return DateTime.fromMillisecondsSinceEpoch(millis);
+  }
+
+  Future<void> setFirstOpenAt(DateTime? at) async {
+    final sp = await _prefs();
+    if (at == null) {
+      await sp.remove(_kFirstOpenAt);
+    } else {
+      await sp.setInt(_kFirstOpenAt, at.millisecondsSinceEpoch);
+    }
+  }
+
+  /// Écriture unique : la date déjà persistée n'est JAMAIS écrasée, sans
+  /// quoi l'ancienneté repartirait de zéro à chaque lancement et le critère
+  /// des 7 jours ne serait jamais atteint.
+  Future<void> recordFirstOpenIfAbsent({DateTime? now}) async {
+    final sp = await _prefs();
+    if (sp.getInt(_kFirstOpenAt) != null) return;
+    await sp.setInt(
+      _kFirstOpenAt,
+      (now ?? DateTime.now()).millisecondsSinceEpoch,
+    );
+  }
+
+  /// Instant de la dernière sollicitation d'évaluation **émise**, ou `null`
+  /// si aucune ne l'a jamais été. Google ne renvoyant jamais l'issue réelle
+  /// du dialogue (noté / fermé / non affiché), c'est l'émission de la
+  /// demande — et elle seule — qui consomme le cooldown de 90 jours.
+  Future<DateTime?> getLastReviewPromptedAt() async {
+    final sp = await _prefs();
+    final millis = sp.getInt(_kLastReviewPromptedAt);
+    if (millis == null) return null;
+    return DateTime.fromMillisecondsSinceEpoch(millis);
+  }
+
+  Future<void> setLastReviewPromptedAt(DateTime? at) async {
+    final sp = await _prefs();
+    if (at == null) {
+      await sp.remove(_kLastReviewPromptedAt);
+    } else {
+      await sp.setInt(_kLastReviewPromptedAt, at.millisecondsSinceEpoch);
+    }
+  }
+
   static Future<void> saveSelectedPersons(List<String> persons) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList('selected_persons', persons);
@@ -221,7 +388,7 @@ class UserPrefs {
 
   static Future<void> savePersonsData(Map<String, String> data) async {
     final prefs = await SharedPreferences.getInstance();
-    prefs.setString('persons_data', jsonEncode(data));
+    await prefs.setString('persons_data', jsonEncode(data));
   }
 
   static Future<Map<String, String>> getPersonsData() async {

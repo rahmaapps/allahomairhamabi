@@ -1,28 +1,41 @@
+import 'dart:async';
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // Clipboard + Haptics
 import 'package:flutter/rendering.dart'; // RenderRepaintBoundary
 import 'package:share_plus/share_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:in_app_review/in_app_review.dart';
 
+import 'app_branding.dart';
 import 'dua_repository.dart';
 import 'models/dua.dart';
-import 'models/person_type.dart';
+import 'monetization/interstitial_ad_controller.dart';
+import 'monetization/interstitial_trigger.dart';
+import 'monetization/rewarded_wording.dart';
+import 'monetization/share_as_image_flow.dart';
+import 'review/review_prompt_controller.dart';
+import 'review/review_trigger.dart';
 import 'user_prefs.dart';
 import 'settings_screen.dart';
 import 'favorites_screen.dart';
 import 'search_screen.dart';
 import 'screens/person_selection_screen.dart';
-import 'widgets/islamic_pattern_painter.dart';
-import 'widgets/islamic_bg_motif_painter.dart';
+import 'screens/grave_visit_read_screen.dart';
 import 'premium_templates.dart';
 import 'widgets/premium_export_card.dart';
+import 'widgets/app_snackbar.dart';
+import 'widgets/rewarded_confirmation_sheet.dart';
 import 'dua_personalizer.dart';
+import 'theme/app_colors.dart';
+import 'theme/app_radii.dart';
+import 'theme/app_spacing.dart';
+import 'theme/app_typography.dart';
+import 'widgets/app_bar.dart';
+import 'widgets/app_button.dart';
+import 'widgets/app_card.dart';
+import 'widgets/app_chip.dart';
+import 'widgets/app_empty_state.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -39,72 +52,109 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   int? _currentId;
   bool _isFavorite = false;
 
-  bool get isGraveVisit => _activeCategory == 'grave_visit';
+  // État vide/erreur (§P1-G) — jamais affiché dans la carte sacrée (§3 :
+  // gabarit `AppEmptyState`, « hors de la carte sacrée »). `null` : la
+  // carte affiche `_currentDuaText` normalement ; non-null : la carte N1
+  // (filet d'or + rosace) n'est pas rendue, `AppEmptyState` la remplace
+  // avec ce message.
+  String? _emptyStateMessage;
 
   //Suffixe des textes copiés ou partagés
-  static const String _ATTR_SUFFIX_AR =
-      '\n\n— من تطبيق اللَّهُمَّ ارْحَمْ أَبِي —';
-
-  // Lien public de l'application (remplace par l'URL finale Play Store / AppGallery / site)
-  static const String _APP_LINK =
-      'https://play.google.com/store/apps/details?id=com.joumane.allahomairhamabi';
-
-// Message court pour partager l'app (WhatsApp / autres)
-  static const String _APP_SHARE_TEXT =
-      'شارك الأجر – أرسل التطبيق لأهلك:\n$_APP_LINK';
+  static const String _ATTR_SUFFIX_AR = AppBranding.shareAttributionSuffix;
 
   // ===== Filtres =====
-  String _activeCategory = 'normal'; // 'normal' | 'friday' | 'grave_visit'
+  // زيارة القبر a son propre écran dédié (LOT 3.F) — plus jamais atteint via
+  // _activeCategory (ancien pont supprimé).
+  String _activeCategory = 'normal'; // 'normal' | 'friday'
   String _lengthFilter = 'all'; // 'all' | 'short' | 'long'
-
-  PersonType selectedPerson =
-      PersonType.father; //variables dédié à la selection des personnes
 
   // ===== Deck anti-répétition =====
   final List<int> _deckIds = <int>[];
   int _deckCursor = 0;
 
   // ===== Animations =====
-  late final AnimationController _anim;
-  late final Animation<double> _fade;
-  late final Animation<Offset> _slide;
-  late final AnimationController _heartCtrl;
+  // C1 « دعاء آخر » (renouvellement de contenu) : 280 ms, easeOutCubic,
+  // déplacement vertical 10 dp uniquement, entrée par le bas. La carte/le
+  // support ne bougent jamais — seul le contenu texte est translaté, jamais
+  // fondu (le texte sacré reste peint à l'opacité 1 dès la frame 0).
+  late final AnimationController _duaAnimCtrl;
+  late final Animation<double> _duaSlide;
 
-  // ===== Capture image (Option A – gradient inline, désactivée côté bouton) =====
-  final GlobalKey _imageKey = GlobalKey();
+  // B2 changement de catégorie (changement de contexte) : glissement
+  // horizontal RTL 16 dp, 240 ms, easeInOutCubic. Contrôleur distinct de
+  // C1 — les deux mouvements ne portent jamais la même sémantique.
+  late final AnimationController _categoryAnimCtrl;
+  late final Animation<double> _categorySlide;
+
+  late final AnimationController _heartCtrl;
+  late final Animation<double> _heartScale;
 
   // ===== Export Premium (carte-image partageable du dou'a affiché) =====
   // Une seule clé : décision produit V1.2 — toujours EXACTEMENT une image
   // partagée, quelle que soit la longueur du dou'a. PremiumExportCard
   // restreint elle-même le rendu Dark Luxe paginé à sa première page.
   final GlobalKey _exportKey = GlobalKey();
+  // Mesure de position du feedback de copie (voir `_copyFeedbackMargin`).
+  final GlobalKey _copyShareKey = GlobalKey();
+  final GlobalKey _bodyKey = GlobalKey();
   PremiumTemplate _selectedTemplate = PremiumTemplate.darkLuxe;
+
+  // Espace réservé en bas de la carte pour le pied (♡ + « دعاء آخر ») :
+  // hauteur de AppButton (48, fixe — §3) + un espacement de respiration.
+  // La zone de texte défilant s'arrête au-dessus, jamais derrière.
+  static const double _cardFooterReservedHeight = 56;
+
+  // Rail paysage (LOT HOME LANDSCAPE — décision UX validée) : largeur de
+  // référence du rail latéral regroupant les chips catégories et la ligne
+  // « pour qui » en paysage. Remplace les anciens correctifs de compression
+  // (padding/gaps resserrés, interligne réduit, `_cardFooterReservedHeightLandscape`)
+  // — devenus inutiles une fois `Expanded(AppCard)` libéré de ces éléments,
+  // qui ne rivalisent plus avec sa hauteur puisqu'ils vivent désormais à
+  // côté d'elle, pas au-dessus.
+  static const double _landscapeRailWidth = 108;
 
   @override
   void initState() {
     super.initState();
 
+    // Aligné à l'identique sur le ♥ déjà conforme de DuaReadScreen (§P1-H) :
+    // 1 → 1.12 → 1 en 200 ms, easeOut, jamais animé au retrait.
     _heartCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 250),
-      lowerBound: 0.7,
-      upperBound: 1.2,
+      duration: const Duration(milliseconds: 200),
+    );
+    _heartScale = Tween<double>(begin: 1, end: 1.12).animate(
+      CurvedAnimation(parent: _heartCtrl, curve: Curves.easeOut),
     );
 
-    _anim = AnimationController(
+    _duaAnimCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 450),
+      duration: const Duration(milliseconds: 280),
     );
-    _fade = CurvedAnimation(parent: _anim, curve: Curves.easeInOut);
-    _slide = Tween<Offset>(begin: const Offset(0, 0.15), end: Offset.zero)
-        .animate(CurvedAnimation(parent: _anim, curve: Curves.easeOut));
+    _duaSlide = Tween<double>(begin: 10, end: 0).animate(
+      CurvedAnimation(parent: _duaAnimCtrl, curve: Curves.easeOutCubic),
+    );
+
+    _categoryAnimCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 240),
+      // Au repos (fin d'animation) : `_categorySlide` vaut 0 dès le premier
+      // affichage — sinon le texte restait décalé de 16 dp jusqu'au premier
+      // changement de catégorie. `forward(from: 0)` inchangé.
+      value: 1.0,
+    );
+    _categorySlide = Tween<double>(begin: 16, end: 0).animate(
+      CurvedAnimation(parent: _categoryAnimCtrl, curve: Curves.easeInOutCubic),
+    );
 
     _loadInitial();
+    _loadSelectedTemplate();
   }
 
   @override
   void dispose() {
-    _anim.dispose();
+    _duaAnimCtrl.dispose();
+    _categoryAnimCtrl.dispose();
     _heartCtrl.dispose();
     super.dispose();
   }
@@ -112,20 +162,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // ===========================================================================
   // CHARGEMENT INITIAL
   // ===========================================================================
-
-  Future<void> _rateApp() async {
-    final InAppReview inAppReview = InAppReview.instance;
-    if (await inAppReview.isAvailable()) {
-      // Ouvre la popup native d'évaluation
-      await inAppReview.requestReview();
-      return;
-    } else {
-      // Ouvre la page Play Store (après publication officielle)
-      await inAppReview.openStoreListing(
-        appStoreId: null, // pas utilisé sur Android
-      );
-    }
-  }
 
   // Source de vérité unique pour appliquer le prénom personnalisé au texte
   // d'un dou'a (V1.2). CONTRAIREMENT à l'ancienne version, la personne n'est
@@ -140,8 +176,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Future<void> _loadInitial() async {
     await _refreshLengthFilter();
 
-    // ✅ définir catégorie par défaut
-    _activeCategory ??= 'normal';
     personsData = await UserPrefs.getPersonsData();
 
 
@@ -162,10 +196,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     if (d != null) {
       _currentId = d.id;
       _currentDuaText = _personalizeDuaText(d.text, d.personKey);
+      _emptyStateMessage = null;
 
       _isFavorite = await UserPrefs.instance.isFavorite(_currentId!);
       if (mounted) setState(() {});
-      _anim.forward(from: 0);
+      _duaAnimCtrl.forward(from: 0);
     }
 
     // Préparer le deck filtré (en évitant de répéter le dou‘a courant)
@@ -177,22 +212,37 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         await UserPrefs.instance.getLengthFilter(); // 'all' | 'short' | 'long'
   }
 
-  // ===========================================================================
-  // RECONSTRUIRE LE DECK (longueur + catégorie) AVEC FALLBACK “all”
-  // ===========================================================================
+  /// Charge le template Partage Premium choisi lors d'une session
+  /// précédente (§4 Partage Premium : « Persistée (share_template) »).
+  /// Dark Luxe reste la valeur par défaut si aucune préférence n'existe
+  /// ou si la valeur stockée ne correspond plus à un template connu.
+  Future<void> _loadSelectedTemplate() async {
+    final saved = await UserPrefs.instance.getShareTemplate();
+    if (!mounted) return;
+    setState(() => _selectedTemplate = _templateFromName(saved));
+  }
+
+  PremiumTemplate _templateFromName(String? name) {
+    if (name == null) return PremiumTemplate.darkLuxe;
+    return PremiumTemplate.values.firstWhere(
+      (t) => t.name == name,
+      orElse: () => PremiumTemplate.darkLuxe,
+    );
+  }
 
   // ===========================================================================
   // TIRAGE ALÉATOIRE (respecte la cat ; fallback “all”)
-  Future<void> _loadRandomDua({bool ignoreCategory = false}) async {
+  Future<void> _loadRandomDua({
+    bool ignoreCategory = false,
+    bool isCategoryChange = false,
+  }) async {
     await _refreshLengthFilter();
 
     try {
       // ✅ Charger le JSON complet
       final data = await _repo.getFullJson();
-      // ⚠️ (si tu n’as pas cette méthode encore, on l’ajoutera après)
 
       // ✅ choisir une personne d'abord
-
       final persons = personsData.isEmpty
           ? ['general']   // ✅ FORCER GENERAL
           : personsData.keys.toList();
@@ -207,9 +257,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ? list
           : data[randomKey]?['normal'] ?? [];
 
-    // sécurité
+    // sécurité — état vide (§P1-G) : jamais dans la carte sacrée,
+      // `AppEmptyState` la remplace (voir build()). `_currentDuaText` n'est
+      // plus écrasé : نسخ/مشاركة, s'ils restent visibles, continuent de
+      // porter le dernier douʿā réel affiché plutôt qu'un message d'erreur.
       if (finalList.isEmpty) {
-        _currentDuaText = "لا يوجد دعاء حالياً";
+        _emptyStateMessage = "لا يوجد دعاء حالياً";
         if (mounted) setState(() {});
         return;
       }
@@ -225,14 +278,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       // ✅ id réel du dou'a (V1.2) — jamais un timestamp : un favori créé
       // à partir de ce repli doit pointer vers une entrée existante du JSON.
       _currentId = random['id'] as int;
+      _emptyStateMessage = null;
 
       if (mounted) setState(() {});
-      _anim.forward(from: 0);
+      if (isCategoryChange) {
+        _categoryAnimCtrl.forward(from: 0);
+      } else {
+        _duaAnimCtrl.forward(from: 0);
+      }
 
     } catch (e) {
-      print("❌ ERREUR: $e");
+      debugPrint("❌ ERREUR: $e");
 
-      _currentDuaText = "حدث خطأ أثناء تحميل الدعاء";
+      // État d'erreur (§P1-G) — jamais dans la carte sacrée, voir plus haut.
+      _emptyStateMessage = "حدث خطأ أثناء تحميل الدعاء";
       if (mounted) setState(() {});
     }
   }
@@ -255,10 +314,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     await _rebuildDeckFiltered(excludeId: _currentId);
 
     if (_deckIds.isNotEmpty) {
-      await _showNextFromDeck();
+      await _showNextFromDeck(isCategoryChange: true);
     } else {
       // fallback si la cat ne renvoie rien (on ignore la catégorie)
-      await _loadRandomDua(ignoreCategory: true);
+      await _loadRandomDua(ignoreCategory: true, isCategoryChange: true);
     }
   }
 
@@ -275,11 +334,34 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     HapticFeedback.selectionClick();
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('تم النسخ ✓'),
-        duration: Duration(seconds: 1),
+      SnackBar(
+        content: const Text('تم النسخ ✓'),
+        duration: const Duration(seconds: 1),
+        // Flottant, au-dessus de la rangée نسخ / مشاركة : en mode `fixed`,
+        // le snackbar s'ancrait au bas du `Scaffold` et recouvrait la rangée
+        // d'actions, en partie sous la barre de navigation Android.
+        behavior: SnackBarBehavior.floating,
+        margin: _copyFeedbackMargin(),
       ),
     );
+  }
+
+  /// Marge du feedback de copie : place le snackbar flottant juste
+  /// au-dessus de la rangée نسخ / مشاركة, quelle que soit sa disposition
+  /// réelle (horizontale, verticale, paysage). Mesurée au moment du tap,
+  /// depuis le bas du contenu du `SafeArea` du `body` : comme l'ancrage
+  /// d'un snackbar flottant (`Scaffold`), il s'arrête au-dessus de la barre
+  /// de navigation Android — l'inset n'est donc compté qu'une fois.
+  /// `null` (marge flottante par défaut) si la mesure est impossible.
+  EdgeInsets? _copyFeedbackMargin() {
+    final row = _copyShareKey.currentContext?.findRenderObject() as RenderBox?;
+    final body = _bodyKey.currentContext?.findRenderObject() as RenderBox?;
+    if (row == null || body == null || !row.hasSize || !body.hasSize) return null;
+
+    final rowTop = row.localToGlobal(Offset.zero).dy;
+    final bodyBottom = body.localToGlobal(Offset(0, body.size.height)).dy;
+    final bottom = math.max(bodyBottom - rowTop + AppSpacing.sm, 0.0);
+    return EdgeInsets.fromLTRB(AppSpacing.lg, 0, AppSpacing.lg, bottom);
   }
 
   void _shareDuaText() {
@@ -292,74 +374,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  Future<void> _shareAppOnWhatsApp() async {
-    final text = _APP_SHARE_TEXT;
-
-    // Encodage URL pour WhatsApp
-    final uri = Uri.parse('whatsapp://send?text=${Uri.encodeComponent(text)}');
-
-    // Si WhatsApp n'est pas installé, on propose un fallback (lien web)
-    if (!await canLaunchUrl(uri)) {
-      // Fallback: partage générique via le ShareSheet (optionnel) ou simple Snack
-      // Ici, on affiche un message amical.
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-                'يبدو أن واتساب غير مُثبت. يمكنك مشاركة هذا الرابط يدويًا.'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
-      return;
-    }
-
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
-  }
-
-  // ===========================================================================
-  // Partage en image : désactivé pour cette version (message “bientôt”)
-  // ===========================================================================
-  void _shareImageSoon() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content:
-            Text('ميزة مشاركة الدعاء كصورة ستكون جاهزة قريباً إن شاء الله'),
-        duration: Duration(seconds: 2),
-      ),
-    );
-  }
-
-  // (si tu veux garder la capture prête)
-  Future<Uint8List?> _captureImage() async {
-    try {
-      await WidgetsBinding.instance.endOfFrame;
-      final ctx = _imageKey.currentContext;
-      if (ctx == null) return null;
-      final ro = ctx.findRenderObject();
-      if (ro is! RenderRepaintBoundary) return null;
-
-      int tries = 0;
-      while (ro.debugNeedsPaint && tries < 5) {
-        await Future.delayed(const Duration(milliseconds: 16));
-        await WidgetsBinding.instance.endOfFrame;
-        tries++;
-      }
-
-      final ui.Image image = await ro.toImage(pixelRatio: 3.0);
-      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-      return byteData?.buffer.asUint8List();
-    } catch (e, st) {
-      debugPrint('Erreur capture: $e\n$st');
-      return null;
-    }
-  }
-
   // ===========================================================================
   // Export Premium : capture du RepaintBoundary (_exportKey) → PNG → partage
   // Toujours EXACTEMENT une image (décision produit V1.2), quelle que soit
-  // la longueur du dou'a. Même patron de capture/retry que _captureImage()
-  // ci-dessus.
+  // la longueur du dou'a.
   // ===========================================================================
   Future<Uint8List?> _renderPremiumPng() async {
     try {
@@ -371,7 +389,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
       // La fermeture animée du bottom sheet peut laisser le repaint en
       // attente sur plusieurs frames : un seul endOfFrame ne suffit pas
-      // toujours. Même patron de retry borné que _captureImage() ci-dessus.
+      // toujours. Retry borné.
       int tries = 0;
       while (boundary.debugNeedsPaint && tries < 5) {
         await Future.delayed(const Duration(milliseconds: 16));
@@ -388,70 +406,270 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
-  Future<void> _sharePremiumImage() async {
-    final png = await _renderPremiumPng();
-    if (png == null) return;
+  /// LOT 5.G.B — porte Rewarded du Partage comme image (B2/B3/B4), sans
+  /// aucune logique publicitaire dans cet écran : tout est dans
+  /// [ShareAsImageFlow]. Le partage TEXTE (`_shareDuaText`) n'est jamais
+  /// concerné.
+  final ShareAsImageFlow _shareAsImageFlow = ShareAsImageFlow();
 
-    await Share.shareXFiles([
-      XFile.fromData(png, name: 'dua_premium.png', mimeType: 'image/png'),
-    ]);
+  /// Remise effective de l'image au système de partage natif. Toute
+  /// exception remonte à [ShareAsImageFlow], qui restitue alors
+  /// l'autorisation éventuellement consommée — plus jamais un échec
+  /// silencieux (§4 Partage Premium).
+  Future<void> _invokeImageShare(Uint8List png) async {
+    try {
+      await Share.shareXFiles([
+        XFile.fromData(png, name: 'dua_premium.png', mimeType: 'image/png'),
+      ]);
+    } catch (e, st) {
+      debugPrint('Erreur partage Premium: $e\n$st');
+      rethrow;
+    }
   }
 
+  // Bottom sheet Partage Premium — 3 vignettes 74×104, poids strictement
+  // égal, ordre RTL Dark Luxe → Emerald → White (§4 Partage Premium).
+  // Sélection = 3 signaux simultanés : anneau 2px, pastille ✓, libellé 600.
+  //
+  // Flux (§4, alignement littéral) : la sélection d'une vignette PERSISTE
+  // le template mais ne déclenche plus le partage — un bouton d'action
+  // unique en bas de la feuille (« مشاركة كصورة ») lance ensuite la
+  // génération/partage. `StatefulBuilder` local à la feuille, aucun nouvel
+  // écran/composant séparé. Le bouton garde toujours sa taille (largeur
+  // `double.infinity` + hauteur fixe 48 d'`AppButton`) ; seul son contenu
+  // change (« جارٍ التحضير… » après 400 ms). La feuille se ferme
+  // uniquement après succès du partage natif ; en cas d'échec elle reste
+  // ouverte, la ligne d'erreur apparaît AU-DESSUS du bouton (§4), et le
+  // bouton reste disponible pour réessayer. `sheetContext.mounted` évite
+  // tout `setState`/`Navigator.pop` après fermeture manuelle de la
+  // feuille pendant une génération en cours.
   void _openTemplatePicker() {
+    final cs = Theme.of(context).colorScheme;
+
+    // État de la feuille : déclaré ICI, une seule fois par ouverture — PAS
+    // dans le `builder` de `showModalBottomSheet`, que Flutter peut
+    // réévaluer (constaté au retour d'un Rewarded plein écran), ce qui
+    // recréait ces variables à leur valeur initiale pendant un partage en
+    // cours ; ni dans le builder de `StatefulBuilder` ci-dessous, qui se
+    // ré-exécute à chaque `setSheetState`.
+    bool busy = false;
+    bool showPreparingLabel = false;
+    // LOT 5.G.B — Rewarded en chargement/présentation (B6).
+    bool loadingAd = false;
+    String? errorMessage;
+    Timer? prepTimer;
+
     showModalBottomSheet(
       context: context,
       useSafeArea: true,
       showDragHandle: true,
-      builder: (context) {
-        final items = PremiumTemplate.values;
+      // Fond `bg` (§P2-C), pas `surface` — §3 spécifie `bg` pour les bottom
+      // sheets ; `bg` == `ThemeData.scaffoldBackgroundColor` (voir
+      // `theme/app_theme.dart`), déjà le mécanisme centralisé existant.
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadii.hero)),
+      ),
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            // Sélection seule : persiste le template (§4 : « Persistée
+            // (share_template) »), ne lance rien. `setSheetState` fait
+            // réapparaître l'anneau/pastille sur la bonne vignette — la
+            // feuille n'est pas un descendant de `HomeScreen` dans
+            // l'arbre (route séparée du `Navigator`), un `setState`
+            // externe seul ne la reconstruirait pas.
+            void selectTemplate(PremiumTemplate t) {
+              if (busy) return;
+              setState(() => _selectedTemplate = t);
+              unawaited(UserPrefs.instance.setShareTemplate(t.name));
+              setSheetState(() {});
+            }
 
-        return GridView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: items.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3,
-            mainAxisSpacing: 16,
-            crossAxisSpacing: 16,
-            childAspectRatio: 0.75,
-          ),
-          itemBuilder: (_, index) {
-            final t = items[index];
-            final selected = t == _selectedTemplate;
+            Future<void> handleSharePressed() async {
+              if (busy) return;
 
-            return InkWell(
-              onTap: () {
-                setState(() => _selectedTemplate = t);
-                Navigator.pop(context);
-                _sharePremiumImage();
-              },
-              child: Stack(
-                alignment: Alignment.bottomCenter,
+              setSheetState(() {
+                busy = true;
+                showPreparingLabel = false;
+                loadingAd = false;
+                errorMessage = null;
+              });
+
+              // « جارٍ التحضير… » affiché seulement au-delà de 400 ms
+              // (§4) — jamais pour un rendu quasi instantané. Démarré
+              // uniquement à la phase de rendu : jamais pendant la
+              // confirmation ni pendant l'annonce.
+              void startPrepTimer() {
+                prepTimer?.cancel();
+                prepTimer = Timer(const Duration(milliseconds: 400), () {
+                  if (sheetContext.mounted) {
+                    setSheetState(() => showPreparingLabel = true);
+                  }
+                });
+              }
+
+              // Vrai dès que ce partage passe par un Rewarded (phase
+              // `loadingAd`) — local à cet appui. Au retour de l'annonce,
+              // « جارٍ التحضير… » s'affiche alors immédiatement, sans le
+              // délai de 400 ms : le rendu lourd qui suit pouvait sinon le
+              // masquer jusqu'à la fin. Parcours sans annonce inchangé.
+              var adShown = false;
+
+              final result = await _shareAsImageFlow.run(
+                confirm: () => showRewardedConfirmation(sheetContext),
+                render: _renderPremiumPng,
+                share: _invokeImageShare,
+                onRewardEarned: () {
+                  if (sheetContext.mounted) {
+                    showAppToast(sheetContext, RewardedWording.shareAsImageEarned);
+                  }
+                },
+                onPhase: (phase) {
+                  if (phase == ShareAsImagePhase.loadingAd) adShown = true;
+                  if (!sheetContext.mounted) return;
+                  if (phase == ShareAsImagePhase.preparingImage && adShown) {
+                    prepTimer?.cancel();
+                    setSheetState(() {
+                      loadingAd = false;
+                      showPreparingLabel = true;
+                    });
+                    return;
+                  }
+                  setSheetState(
+                    () => loadingAd = phase == ShareAsImagePhase.loadingAd,
+                  );
+                  if (phase == ShareAsImagePhase.preparingImage) {
+                    startPrepTimer();
+                  }
+                },
+              );
+              prepTimer?.cancel();
+
+              if (!sheetContext.mounted) return;
+
+              switch (result) {
+                case ShareAsImageResult.shared:
+                  Navigator.pop(sheetContext);
+                case ShareAsImageResult.cancelled:
+                  // Choix de l'utilisateur : feuille intacte, aucun message.
+                  setSheetState(() {
+                    busy = false;
+                    showPreparingLabel = false;
+                    loadingAd = false;
+                  });
+                case ShareAsImageResult.renderFailed:
+                case ShareAsImageResult.shareFailed:
+                  setSheetState(() {
+                    busy = false;
+                    showPreparingLabel = false;
+                    loadingAd = false;
+                    errorMessage = 'تعذّر تحضير الصورة، حاول مرة أخرى';
+                  });
+              }
+            }
+
+            // `MediaQuery.viewPaddingOf` (jamais réduit par un `SafeArea`
+            // ancêtre, contrairement à `.padding`) : garantit que le bouton
+            // « مشاركة كصورة » reste entièrement visible au-dessus de la
+            // barre de navigation système, quel que soit le comportement
+            // réel de `useSafeArea` sur l'appareil — même correctif déjà
+            // appliqué à la feuille دعاء زيارة القبر
+            // (`_openGraveVisitPersonPicker`) suite à la même anomalie
+            // constatée en test manuel (LOT 3.L).
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                AppSpacing.xl,
+                AppSpacing.md,
+                AppSpacing.xl,
+                AppSpacing.xxl + MediaQuery.viewPaddingOf(sheetContext).bottom,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(14),
-                      image: DecorationImage(
-                        image: AssetImage(t.thumbAsset),
-                        fit: BoxFit.cover,
-                      ),
-                      border: Border.all(
-                        width: 2,
-                        color: selected
-                            ? Theme.of(context).colorScheme.primary
-                            : Colors.transparent,
-                      ),
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    textDirection: TextDirection.rtl,
+                    children: PremiumTemplate.values.map((t) {
+                      final selected = t == _selectedTemplate;
+
+                      return GestureDetector(
+                        onTap: () => selectTemplate(t),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Container(
+                                  width: 74,
+                                  height: 104,
+                                  decoration: BoxDecoration(
+                                    borderRadius: AppRadii.cardRadius,
+                                    image: DecorationImage(
+                                      image: AssetImage(t.thumbAsset),
+                                      fit: BoxFit.cover,
+                                    ),
+                                    border: Border.all(
+                                      width: selected ? 2 : 1,
+                                      color: selected ? cs.primary : cs.outline,
+                                    ),
+                                  ),
+                                ),
+                                if (selected)
+                                  Positioned(
+                                    top: -6,
+                                    right: -6,
+                                    child: Icon(Icons.check_circle,
+                                        color: cs.primary, size: 18),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
+                            Text(
+                              t.displayName,
+                              textDirection: TextDirection.rtl,
+                              style: AppTypography.label.copyWith(
+                                color: cs.onSurface,
+                                fontWeight:
+                                    selected ? FontWeight.w600 : FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
                   ),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.black45,
-                      borderRadius: BorderRadius.circular(8),
+                  const SizedBox(height: AppSpacing.lg),
+                  // État échec (§4 : « une ligne d'erreur au-dessus du
+                  // bouton ») — inline, aucun SnackBar/dialogue ; la
+                  // feuille reste utilisable, le bouton permet de
+                  // réessayer.
+                  if (errorMessage != null) ...[
+                    Text(
+                      errorMessage!,
+                      textAlign: TextAlign.center,
+                      textDirection: TextDirection.rtl,
+                      style: AppTypography.label.copyWith(color: cs.error),
                     ),
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    margin: const EdgeInsets.all(8),
-                    child: Text(
-                      t.displayName,
-                      style: const TextStyle(color: Colors.white),
+                    const SizedBox(height: AppSpacing.sm),
+                  ],
+                  // Bouton d'action unique — taille fixe (largeur pleine +
+                  // hauteur 48 d'AppButton) quel que soit son contenu ;
+                  // seul le contenu change, jamais la taille (§4).
+                  SizedBox(
+                    width: double.infinity,
+                    child: AppButton(
+                      role: AppButtonRole.primary,
+                      icon: (showPreparingLabel || loadingAd)
+                          ? null
+                          : Icons.ios_share,
+                      label: loadingAd
+                          ? RewardedWording.loading
+                          : showPreparingLabel
+                              ? 'جارٍ التحضير…'
+                              : 'مشاركة كصورة',
+                      onPressed: busy ? null : handleSharePressed,
                     ),
                   ),
                 ],
@@ -463,10 +681,98 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  Future<void> _rebuildDeckFiltered({int? excludeId}) async {
+  // Bottom sheet دعاء زيارة القبر — choix explicite de la personne avant la
+  // lecture (LOT 3.F). Réutilise exactement le motif déjà en place pour
+  // Partage Premium (_openTemplatePicker) : showModalBottomSheet +
+  // useSafeArea + showDragHandle + coin haut r-hero. Options strictement
+  // limitées aux personnes déjà configurées (`personsData.keys`), jamais
+  // les 11 `PersonType.values`. Aucune persistance, aucun champ prénom,
+  // aucune multi-sélection, aucun badge `الحالي`, aucune snackbar — un tap
+  // ferme la feuille et ouvre directement l'écran de lecture.
+  void _openGraveVisitPersonPicker() {
+    showModalBottomSheet(
+      context: context,
+      useSafeArea: true,
+      showDragHandle: true,
+      // Fond `bg` (§P2-C) — voir même correctif dans `_openTemplatePicker`.
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadii.hero)),
+      ),
+      builder: (sheetContext) {
+        // Aucune personne configurée : gabarit d'état vide existant
+        // (`AppEmptyState`), jamais un nouvel état inventé (§3 « Composants
+        // communs »). Le bandeau HOME reste visible dans tous les cas —
+        // seul le contenu de la feuille change.
+        if (personsData.isEmpty) {
+          return SizedBox(
+            height: 340,
+            child: AppEmptyState(
+              message: 'اختر الشخص الذي تريد قراءة الدعاء عند زيارة قبره',
+              helper: 'لم تختر شخصًا بعد',
+              buttonLabel: 'اختيار شخص',
+              onButtonPressed: () async {
+                Navigator.pop(sheetContext);
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const PersonSelectionScreen()),
+                );
+                // Retour normal au HOME depuis Person Selection — aucune
+                // ouverture automatique de l'écran de lecture (LOT 3.F).
+                // Recharge personsData (même correctif que
+                // `_openPersonSelection`) : sans cela, une réouverture
+                // immédiate de دعاء زيارة القبر retrouvait l'ancien
+                // `personsData` en mémoire et réaffichait l'état vide malgré
+                // la personne qui vient d'être cochée (anomalie constatée
+                // en test manuel).
+                final newPersonsData = await UserPrefs.getPersonsData();
+                if (!mounted) return;
+                setState(() => personsData = newPersonsData);
+              },
+            ),
+          );
+        }
 
-    // ✅ DEBUG ICI (1ère ligne)
-    print("INSIDE rebuild personsData: $personsData");
+        // `MediaQuery.viewPaddingOf` (jamais réduit par un `SafeArea`
+        // ancêtre, contrairement à `.padding`) : garantit que la dernière
+        // chip reste entièrement visible au-dessus de la barre de
+        // navigation système, quel que soit le comportement réel de
+        // `useSafeArea` sur l'appareil (anomalie constatée en test manuel).
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            AppSpacing.xl,
+            AppSpacing.md,
+            AppSpacing.xl,
+            AppSpacing.xxl + MediaQuery.viewPaddingOf(sheetContext).bottom,
+          ),
+          child: Wrap(
+            textDirection: TextDirection.rtl,
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            alignment: WrapAlignment.center,
+            children: personsData.keys.map((key) {
+              return AppChip(
+                variant: AppChipVariant.person,
+                label: _possessivePersonLabel(key),
+                selected: false,
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => GraveVisitReadScreen(personKey: key),
+                    ),
+                  );
+                },
+              );
+            }).toList(),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _rebuildDeckFiltered({int? excludeId}) async {
 
     await _refreshLengthFilter();
 
@@ -490,15 +796,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     _deckIds.shuffle();
     _deckCursor = 0;
-
-    debugPrint(
-        '[DECK] cat=$_activeCategory len=$_lengthFilter persons=${personsData.keys.toList()} -> ids=${_deckIds.length}');
   }
 
-  Future<void> _showNextFromDeck() async {
+  Future<void> _showNextFromDeck({bool isCategoryChange = false}) async {
 
     if (personsData.isEmpty) {
-      print("⚠️ force rebuild (no persons)");
       _deckIds.clear();
     }
     // recréer deck si vide
@@ -511,7 +813,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     // encore vide ? fallback
     if (_deckIds.isEmpty) {
-      await _loadRandomDua(ignoreCategory: true);
+      await _loadRandomDua(ignoreCategory: true, isCategoryChange: isCategoryChange);
       return;
     }
 
@@ -522,18 +824,453 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     final d = await _repo.getById(id);
     if (d == null) {
-      print("⚠️ Aucun douaa trouvé !");
-      await _loadRandomDua(ignoreCategory: true);
+      await _loadRandomDua(ignoreCategory: true, isCategoryChange: isCategoryChange);
       return;
     }
 
     _currentId = d.id;
     _currentDuaText = _personalizeDuaText(d.text, d.personKey);
+    _emptyStateMessage = null;
 
     _isFavorite = await UserPrefs.instance.isFavorite(_currentId!);
 
     if (mounted) setState(() {});
-    _anim.forward(from: 0);
+    if (isCategoryChange) {
+      _categoryAnimCtrl.forward(from: 0);
+    } else {
+      _duaAnimCtrl.forward(from: 0);
+    }
+  }
+
+  // ===========================================================================
+  // Sélection des personnes — ligne compacte (§2 décision #2 : « une ligne
+  // de 20 dp, pas un bouton »). Callback de retour préservé à l'identique :
+  // recharge personsData, réinitialise le deck, le reconstruit, puis montre
+  // un dou'a cohérent avec la nouvelle sélection.
+  // ===========================================================================
+  Future<void> _openPersonSelection() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const PersonSelectionScreen()),
+    );
+    final newPersonsData = await UserPrefs.getPersonsData();
+
+    setState(() {
+      personsData = newPersonsData;
+      _deckIds.clear();
+      _deckCursor = 0;
+    });
+
+    await _rebuildDeckFiltered(excludeId: _currentId);
+
+    if (_deckIds.isNotEmpty) {
+      await _showNextFromDeck();
+    } else {
+      await _loadRandomDua();
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // Favoris — au retour de l'écran Favoris, le douʿā affiché sur HOME n'a
+  // pas forcément changé mais son état favori a pu être modifié depuis
+  // Favoris (retrait via ♥). Relit l'état réel persisté pour CE douʿā
+  // précis (UserPrefs.instance.isFavorite, déjà utilisé partout ailleurs
+  // dans ce fichier) plutôt que de supposer que ♥ est resté vrai.
+  // ---------------------------------------------------------------------
+  Future<void> _openFavorites() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const FavoritesScreen()),
+    );
+    // LOT 5.C + LOT 5.D — transition naturelle Favoris → HOME. Appelé APRÈS
+    // le retour (la navigation est déjà terminée) et jamais attendu : la
+    // navigation ne dépend ni de la disponibilité d'une publicité, ni de
+    // celle du mécanisme d'évaluation.
+    unawaited(_runPostFavoritesTransition());
+
+    if (!mounted || _currentId == null) return;
+
+    final isFav = await UserPrefs.instance.isFavorite(_currentId!);
+    if (mounted) setState(() => _isFavorite = isFav);
+  }
+
+  /// Suites de la transition Favoris → HOME, séquencées volontairement.
+  ///
+  /// La demande d'évaluation (LOT 5.D) n'est évaluée qu'une fois la
+  /// décision publicitaire tranchée : c'est la seule façon de garantir
+  /// qu'aucune sollicitation n'arrive pendant ni immédiatement autour d'un
+  /// interstitiel, les deux mécanismes partageant cette même transition
+  /// (décision D6). Seul leur ORDRE est fixé ici — les deux services
+  /// restent entièrement distincts et s'ignorent l'un l'autre.
+  Future<void> _runPostFavoritesTransition() async {
+    await InterstitialAdController.instance
+        .maybeShowOnTransition(InterstitialTrigger.leavingFavorites);
+
+    // La décision publicitaire ci-dessus peut prendre plusieurs secondes
+    // (chargement réseau). Entre-temps, l'utilisateur a pu quitter HOME
+    // pour DuaRead ou Grave Visit, où toute sollicitation est interdite
+    // (D6) : on ne sollicite que si HOME est encore l'écran courant.
+    if (!mounted) return;
+    if (!(ModalRoute.of(context)?.isCurrent ?? false)) return;
+
+    await ReviewPromptController.instance
+        .maybeRequestOnTransition(ReviewTrigger.leavingFavorites);
+  }
+
+  /// Recherche — même traitement que `_openFavorites` pour la transition
+  /// Recherche → HOME (LOT 5.C). Aucune demande d'évaluation n'est émise
+  /// sur cette transition : le déclencheur est verrouillé au seul retour
+  /// Favoris → HOME (LOT 5.D, décision D1).
+  Future<void> _openSearch() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const SearchScreen()),
+    );
+    unawaited(
+      InterstitialAdController.instance
+          .maybeShowOnTransition(InterstitialTrigger.leavingSearch),
+    );
+  }
+
+  /// Libellés possessifs déjà établis (`أبي`, `أمي`...) — repris tels
+  /// quels, identiques à ceux de Person Selection, non redécidés ici.
+  String _possessivePersonLabel(String personKey) {
+    switch (personKey) {
+      case 'father':
+        return 'أبي';
+      case 'mother':
+        return 'أمي';
+      case 'parents':
+        return 'والديّ';
+      case 'grandfather':
+        return 'جدي';
+      case 'grandmother':
+        return 'جدتي';
+      case 'brother':
+        return 'أخي';
+      case 'sister':
+        return 'أختي';
+      case 'son':
+        return 'ابني';
+      case 'daughter':
+        return 'ابنتي';
+      case 'husband':
+        return 'زوجي';
+      case 'wife':
+        return 'زوجتي';
+      default:
+        return personKey;
+    }
+  }
+
+  /// Ligne « pour qui » — [compact] l'empile verticalement (résumé puis
+  /// action) au lieu de la disposer sur une seule rangée horizontale :
+  /// utilisé uniquement dans le rail paysage (108dp de large), trop étroit
+  /// pour la rangée horizontale historique. Comportement, textes et style
+  /// (`AppTypography.body`/`bodyStrong`, jamais réduits) strictement
+  /// identiques au mode normal — seule l'orientation de l'empilement change.
+  Widget _buildPersonsLine(
+    ColorScheme cs,
+    bool isDark, {
+    bool compact = false,
+  }) {
+    final hasPersons = personsData.isNotEmpty;
+    final bool isPlural = hasPersons && personsData.length > 1;
+    final String summary = !hasPersons
+        ? 'ادعُ لمن تحب'
+        : personsData.length == 1
+            ? 'تدعو لـ ${_possessivePersonLabel(personsData.keys.first)}'
+            : 'تدعو لـ ${personsData.length} أشخاص';
+    final String action = hasPersons ? 'تغيير' : 'اختيار';
+    final goldText = isDark ? AppColorsDark.gold : AppColorsLight.goldText;
+    final bodyStyle = AppTypography.body.copyWith(color: cs.onSurface);
+
+    // Pas de hauteur fixe (auparavant SizedBox(height: 20)) : la hauteur de
+    // ligne réelle de AppTypography.body/bodyStrong à 15px (~22-26dp selon
+    // le facteur `height`) dépasse 20dp et rognait verticalement le texte
+    // arabe (glyphes déformés). La ligne se dimensionne désormais à son
+    // contenu ; les espacements 12dp au-dessus/en dessous (déjà en place
+    // dans build()) portent le rythme vertical, pas une hauteur imposée ici.
+    final summaryText = Text(
+      summary,
+      textAlign: TextAlign.center,
+      textDirection: TextDirection.rtl,
+      style: bodyStyle,
+    );
+    final actionText = GestureDetector(
+      onTap: _openPersonSelection,
+      child: Text(
+        action,
+        textAlign: TextAlign.center,
+        textDirection: TextDirection.rtl,
+        style: AppTypography.bodyStrong.copyWith(color: goldText),
+      ),
+    );
+
+    if (compact) {
+      // Rail paysage (108dp) : la rangée horizontale historique déborderait
+      // — empilement vertical, même textes/styles.
+      //
+      // Cas pluriel (« تدعو لـ N أشخاص ») : au lieu de laisser le
+      // retour à la ligne naturel couper au hasard (l'algorithme remplit
+      // chaque ligne au maximum, donc casse typiquement entre le chiffre et
+      // « أشخاص » — « تدعو لـ 5 » / « أشخاص », observé sur appareil réel),
+      // le point de séparation logique est forcé entre « تدعو لـ » et
+      // « N أشخاص » via deux `Text` distincts : le second reste un `Text`
+      // normal (espace normal, pas de séparateur insécable, aucun
+      // `maxLines`) — s'il ne tient pas non plus (grand nombre + fort
+      // `textScaler`, jusqu'à 1,6× — §3 Design System), le retour à la
+      // ligne naturel de Flutter reste le filet de sécurité, exactement
+      // comme avant ce correctif.
+      final Widget compactSummary = isPlural
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'تدعو لـ',
+                  textAlign: TextAlign.center,
+                  textDirection: TextDirection.rtl,
+                  style: bodyStyle,
+                ),
+                Text(
+                  '${personsData.length} أشخاص',
+                  textAlign: TextAlign.center,
+                  textDirection: TextDirection.rtl,
+                  style: bodyStyle,
+                ),
+              ],
+            )
+          : summaryText;
+
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          compactSummary,
+          const SizedBox(height: AppSpacing.xs),
+          actionText,
+        ],
+      );
+    }
+
+    return Row(
+      textDirection: TextDirection.rtl,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        summaryText,
+        const SizedBox(width: AppSpacing.sm),
+        actionText,
+      ],
+    );
+  }
+
+  /// ♥ HOME — aligné à l'identique sur le ♥ déjà conforme de
+  /// `DuaReadScreen` (§P1-H) : icône 24, cible tactile 48×48, animation
+  /// `1 → 1.12 → 1` en 200 ms **uniquement à l'ajout** (asymétrie
+  /// volontaire, jamais au retrait). `UserPrefs` reste l'unique source de
+  /// vérité, aucun état local indépendant.
+  Widget _buildFavoriteButton(ColorScheme cs, bool isDark) {
+    final heartInactiveColor =
+        isDark ? AppColorsDark.textSecondary : AppColorsLight.textSecondary;
+
+    return ScaleTransition(
+      scale: _heartScale,
+      child: SizedBox(
+        width: 48,
+        height: 48,
+        child: IconButton(
+          padding: EdgeInsets.zero,
+          onPressed: () async {
+            if (_currentId == null) return;
+            HapticFeedback.selectionClick();
+
+            final wasFavorite = _isFavorite;
+            await UserPrefs.instance.toggleFavorite(_currentId!);
+            final isFav = await UserPrefs.instance.isFavorite(_currentId!);
+
+            // Sauvegarde du texte personnalisé à l'AJOUT uniquement (§P0-A) :
+            // état relu APRÈS le toggle, jamais l'ancienne valeur.
+            if (!wasFavorite && isFav) {
+              await UserPrefs.saveFavoriteText(_currentId!, _currentDuaText);
+              _heartCtrl.forward(from: 0).then((_) => _heartCtrl.reverse());
+            }
+
+            if (mounted) setState(() => _isFavorite = isFav);
+          },
+          icon: Icon(
+            _isFavorite ? Icons.favorite : Icons.favorite_border,
+            size: 24,
+            color: _isFavorite ? cs.error : heartInactiveColor,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Douʿā défilant à l'intérieur de la carte HOME — LOT 3.I.B : plus aucun
+  /// fondu d'opacité en haut/bas (l'ancien `ShaderMask` + `LinearGradient`
+  /// réduisait l'alpha réelle du texte religieux, cause confirmée par audit
+  /// dédié). Coupure nette naturelle aux limites du scroll ; texte toujours
+  /// pleinement opaque, typographie et scroll inchangés.
+  Widget _fadingDuaScroll(ColorScheme cs, bool isLandscape) {
+    // Correction responsive paysage (LOT HOME LANDSCAPE, suite — audit
+    // dédié) : `fontSize: 29` et `height: 2.05` restent strictement
+    // inchangés (texte sacré jamais réduit). Le seul ajustement est
+    // `applyHeightToFirstAscent: false`, qui retire le "leading" que
+    // `height` ajoute par défaut AU-DESSUS de la toute première ligne
+    // (`dart:ui` `TextHeightBehavior`, défaut `true`) — sans toucher
+    // l'interligne des lignes suivantes. En paysage, le viewport de ce
+    // `SingleChildScrollView` peut être si réduit que ce leading (~12dp)
+    // couvre à lui seul tout l'espace visible à l'offset de défilement
+    // initial (0.0) : l'encre de la première ligne n'apparaît qu'après un
+    // geste de défilement, et alors tronquée (cause confirmée par audit
+    // dédié, captures à l'appui). Ce réglage n'a aucun effet en portrait,
+    // où le viewport est déjà largement suffisant.
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      child: Text(
+        _currentDuaText,
+        textAlign: TextAlign.center,
+        textDirection: TextDirection.rtl,
+        style: AppTypography.duaBody.copyWith(color: cs.onSurface),
+        textHeightBehavior: isLandscape
+            ? const TextHeightBehavior(applyHeightToFirstAscent: false)
+            : null,
+      ),
+    );
+  }
+
+  // Chrome interne d'un AppButton (§ widgets/app_button.dart) : padding
+  // horizontal AppSpacing.xl de chaque côté (40) + icône 20 px + espace
+  // AppSpacing.sm (8) avant le libellé = 68 px ne portant jamais de texte.
+  static const double _kActionButtonChrome = 68;
+
+  /// نسخ / مشاركة — paire horizontale par défaut ; bascule verticale si la
+  /// largeur par action passe sous 132 dp, si le texte est agrandi
+  /// (`textScaler` ≥ 1,3), ou si un libellé risque d'être tronqué à la
+  /// largeur réellement mesurée (§2 « Comportement des catégories et des
+  /// actions »). Règle vérifiée par mesure réelle (`TextPainter`), jamais
+  /// par un point de rupture inventé. Réutilise `AppButton` tel quel.
+  Widget _buildCopyShareActions() {
+    final copyButton = AppButton(
+      role: AppButtonRole.action,
+      icon: Icons.copy,
+      label: 'نسخ',
+      onPressed: _copyDua,
+    );
+    final shareButton = AppButton(
+      role: AppButtonRole.action,
+      icon: Icons.share,
+      label: 'مشاركة',
+      onPressed: _shareDuaText,
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final widthPerAction = (constraints.maxWidth - AppSpacing.md) / 2;
+        final textScaler = MediaQuery.textScalerOf(context);
+        final scaledButtonFontSize = textScaler.scale(AppTypography.button.fontSize!);
+        final textScalerTooLarge =
+            scaledButtonFontSize >= AppTypography.button.fontSize! * 1.3;
+
+        final availableTextWidth = widthPerAction - _kActionButtonChrome;
+        bool wouldTruncate(String label) {
+          final painter = TextPainter(
+            text: TextSpan(text: label, style: AppTypography.button),
+            textDirection: TextDirection.rtl,
+            textScaler: textScaler,
+            maxLines: 1,
+          )..layout();
+          return painter.width > availableTextWidth;
+        }
+
+        final needsVertical = widthPerAction < 132 ||
+            textScalerTooLarge ||
+            wouldTruncate('نسخ') ||
+            wouldTruncate('مشاركة');
+
+        if (needsVertical) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              copyButton,
+              const SizedBox(height: AppSpacing.md),
+              shareButton,
+            ],
+          );
+        }
+
+        return Row(
+          children: [
+            Expanded(child: copyButton),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(child: shareButton),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Contenu normal de la carte N1 (extrait tel quel de `build()`, §P1-G) —
+  /// rendu uniquement quand un douʿā réel est affiché (`_emptyStateMessage
+  /// == null`) ; en état vide/erreur, `AppEmptyState` prend sa place dans
+  /// `duaCard` sans jamais instancier `AppCard`.
+  Widget _buildDuaCardContent(ColorScheme cs, bool isDark, bool isLandscape) {
+    return AppCard(
+      // Carte du douʿā du HOME sans rosace en filigrane (décision post-QA :
+      // gênait la lecture) ; fond, filet d'or, arrondis et ombre inchangés.
+      showPattern: false,
+      child: Stack(
+        children: [
+          // Zone de texte contrainte pour exclure structurellement la
+          // bande du pied de carte (♡ + « دعاء آخر ») : à largeur/
+          // hauteur réduites, un douʿā long ne peut plus passer
+          // derrière le bouton, quelle que soit sa longueur — plutôt
+          // qu'un simple chevauchement laissé au hasard du Center.
+          Positioned.fill(
+            bottom: _cardFooterReservedHeight,
+            child: Center(
+              // C1 (دعاء آخر) : translation verticale 10 dp, entrée par
+              // le bas, 280 ms, easeOutCubic. B2 (changement de
+              // catégorie) : translation horizontale RTL 16 dp, 240 ms,
+              // easeInOutCubic. Contrôleurs distincts, jamais actifs
+              // simultanément côté produit ; combinés ici sans risque.
+              child: AnimatedBuilder(
+                animation: Listenable.merge([_duaAnimCtrl, _categoryAnimCtrl]),
+                builder: (context, child) {
+                  return Transform.translate(
+                    offset: Offset(_categorySlide.value, _duaSlide.value),
+                    child: child,
+                  );
+                },
+                child: _fadingDuaScroll(cs, isLandscape),
+              ),
+            ),
+          ),
+
+          // Pied de carte : ♡ + « دعاء آخر » — RTL naturel (aucun
+          // TextDirection.ltr forcé). Immobile : seul le contenu de la
+          // carte est animé (§B2), jamais le pied.
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Row(
+              textDirection: TextDirection.rtl,
+              children: [
+                _buildFavoriteButton(cs, isDark),
+                const Spacer(),
+                AppButton(
+                  role: AppButtonRole.secondary,
+                  icon: Icons.skip_next_rounded,
+                  label: 'دعاء آخر',
+                  onPressed: _showNextFromDeck,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   // ===========================================================================
@@ -545,699 +1282,180 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
 
+    // Couleur du texte/icônes de l'AppBar — jamais `cs.onPrimary` (pensé
+    // pour du texte sur l'accent `primary`, quasi noir en Dark Mode et donc
+    // illisible sur le fond réel `appBar`, également quasi noir en Dark).
+    // Même lecture que celle déjà retenue pour AppVisitBandeau : ivoire fixe
+    // par mode, alignée sur les tokens `onPrimary`(Light)/`textPrimary`(Dark)
+    // déjà utilisés par AppBarTheme lui-même (LOT 1A).
+    final appBarForeground = isDark ? AppColorsDark.textPrimary : AppColorsLight.onPrimary;
+
+    // Rail paysage (LOT HOME LANDSCAPE — décision UX validée) : en paysage,
+    // les chips catégories et la ligne « pour qui » quittent la colonne
+    // verticale pour un rail latéral gauche de 108dp, à côté de la carte au
+    // lieu d'empiler au-dessus d'elle — elles ne rivalisent donc plus pour
+    // la hauteur de `Expanded(AppCard)`. C'est une adaptation responsive du
+    // layout existant (mêmes widgets, même Column pour le portrait,
+    // réutilisés tels quels), pas une nouvelle navigation. Le portrait
+    // reste structurellement identique à avant ce lot (aucune branche
+    // paysage ne s'y applique).
+    final isLandscape = MediaQuery.orientationOf(context) == Orientation.landscape;
+
+    final categoryChipGeneral = AppChip(
+      label: 'عام',
+      selected: _activeCategory == 'normal',
+      onTap: () => _setCategory('normal'),
+    );
+    final categoryChipFriday = AppChip(
+      label: 'دعاء الجمعة',
+      selected: _activeCategory == 'friday',
+      onTap: () => _setCategory('friday'),
+    );
+
+    // ---- Carte du douʿā (N1) — inchangée : padding/filet/rosace de
+    // `AppCard`, `_cardFooterReservedHeight` (56, jamais réduit ici),
+    // `_fadingDuaScroll` (Lateef 29, scroll inchangé). Construite une seule
+    // fois puis placée soit dans la Column portrait, soit dans la Column
+    // principale du Row paysage.
+    final duaCard = Expanded(
+      // État vide/erreur (§P1-G) — jamais habillé en contenu sacré : rendu
+      // hors de la carte N1 (pas de filet d'or, pas de rosace) via le
+      // gabarit générique `AppEmptyState`, à la place de `AppCard` — pas
+      // seulement de son texte.
+      child: _emptyStateMessage != null
+          ? AppEmptyState(message: _emptyStateMessage!)
+          : _buildDuaCardContent(cs, isDark, isLandscape),
+    );
+
+    // ---- نسخ / مشاركة — inchangés (hauteur 48, bascule horizontale/
+    // verticale existante), placés sous la carte dans les deux orientations.
+    final copyShareRow = KeyedSubtree(
+      key: _copyShareKey,
+      child: _buildCopyShareActions(),
+    );
+
+    final Widget bodyContent = isLandscape
+        ? Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // ---- Rail latéral gauche (108dp) : chips + ligne « pour qui »
+              SizedBox(
+                width: _landscapeRailWidth,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    categoryChipGeneral,
+                    const SizedBox(height: AppSpacing.sm),
+                    categoryChipFriday,
+                    const SizedBox(height: AppSpacing.md),
+                    _buildPersonsLine(cs, isDark, compact: true),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              // ---- Carte + boutons dans tout l'espace restant ----
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    duaCard,
+                    const SizedBox(height: AppSpacing.md),
+                    copyShareRow,
+                  ],
+                ),
+              ),
+            ],
+          )
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // ---- Chips catégories (2, 50% chacune) ----
+              Row(
+                children: [
+                  Expanded(child: categoryChipGeneral),
+                  // Gap chips : le document indique 10 (§3 Espacements)
+                  // mais l'échelle base-4 qu'il fixe au même paragraphe
+                  // l'exclut explicitement (« aucune autre valeur ... pas
+                  // de 6, 10, 14, 18 »). Contradiction interne au document
+                  // — signalée dans le rapport, valeur d'échelle la plus
+                  // proche retenue (8) plutôt qu'un 10 hors échelle.
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(child: categoryChipFriday),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.md),
+
+              // ---- Ligne « pour qui » (pas un bouton) ----
+              _buildPersonsLine(cs, isDark),
+              const SizedBox(height: AppSpacing.md),
+
+              duaCard,
+              const SizedBox(height: AppSpacing.md),
+
+              copyShareRow,
+            ],
+          );
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Stack(
         children: [
-          // ---- RepaintBoundary invisible (image export) - Option A ----
-          IgnorePointer(
-            child: Opacity(
-              opacity: 0.01,
-              child: Center(
-                child: RepaintBoundary(
-                  key: _imageKey,
-                  child: SizedBox(
-                    width: 1080,
-                    height: 1350,
-                    child: Container(
-                      padding: const EdgeInsets.all(50),
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Color(0xFF0A0F14), Color(0xFF1F4037)],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                        ),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            _currentDuaText,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontFamily: 'Lateef',
-                              fontSize: 58,
-                              color: Colors.white,
-                              height: 1.7,
-                            ),
-                          ),
-                          const SizedBox(height: 50),
-                          const Text(
-                            '— من تطبيق اللَّهُمَّ ارْحَمْ أَبِي —',
-                            style:
-                                TextStyle(color: Colors.white70, fontSize: 28),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+          Scaffold(
+            appBar: AppTopBar(
+              title: AppBranding.appName,
+              height: 56,
+              titleStyle:
+                  AppTypography.display.copyWith(fontSize: 25, color: appBarForeground),
+              actions: [
+                IconButton(
+                  tooltip: 'البحث',
+                  icon: Icon(Icons.search, color: appBarForeground),
+                  onPressed: _openSearch,
                 ),
+                IconButton(
+                  tooltip: 'المفضلة',
+                  icon: Icon(Icons.favorite_border, color: appBarForeground),
+                  onPressed: _openFavorites,
+                ),
+                // ⤴ Partage Premium : rendue seulement si un douʿā est
+                // réellement affiché (§4 Partage Premium — « si aucun douʿā
+                // n'est affiché, l'icône n'est pas rendue — jamais grisée »).
+                // Absente du tableau `actions`, pas seulement désactivée.
+                if (_currentId != null)
+                  IconButton(
+                    tooltip: 'مشاركة كصورة',
+                    icon: Icon(Icons.ios_share, color: appBarForeground),
+                    onPressed: _openTemplatePicker,
+                  ),
+                // ⋮ → الإعدادات directement (§1 carte de navigation :
+                // « ⋮ → الإعدادات → Personnes / heure / thème / عن التطبيق »).
+                // Aucun menu intermédiaire : pas de destination inventée ici.
+                IconButton(
+                  tooltip: 'الإعدادات',
+                  icon: Icon(Icons.more_vert, color: appBarForeground),
+                  onPressed: () => Navigator.push(
+                      context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
+                ),
+              ],
+              bandeau: AppVisitBandeau(
+                label: 'دعاء زيارة القبر',
+                subtitle: 'للقراءة عند الزيارة',
+                onTap: _openGraveVisitPersonPicker,
+              ),
+            ),
+            body: SafeArea(
+              child: Padding(
+                key: _bodyKey,
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.xl,
+                  AppSpacing.lg,
+                  AppSpacing.xl,
+                  AppSpacing.lg,
+                ),
+                child: bodyContent,
               ),
             ),
           ),
-
-// === ARRIÈRE‑PLAN GLOBAL : Dégradé vert + Motif islamique + Scaffold ===
-
-              // 1) Ton fond dégradé existant (inchangé)
-              Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Color(0xFF006A4E), // vert profond
-                      Color(0xFF009F6B), // vert moyen
-                      Color(0xFF25C4A5), // vert clair
-                    ],
-                  ),
-                ),
-              ),
-
-              // 2) Le motif islamique en filigrane (au-dessus du dégradé)
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: CustomPaint(
-                    painter: IslamicBgMotifPainter(
-// Valeurs “or un peu plus visible”
-                      // Tu peux affiner ensuite sans redémarrer (Hot Reload OK pour ces params)
-                      grid: 104,
-                      starRadius: 24,
-                      strokeOpacity: 0.2,
-                      fillOpacity: 0.07,
-                      strokeWidth: 1.1,
-                      phase: const Offset(28, 14),
-                      // ink: Color(0xFFB8860B), // (optionnel, déjà par défaut
-                    ),
-                  ),
-                ),
-              ),
-
-              Scaffold(
-                backgroundColor: Colors.transparent,
-                appBar: AppBar(
-                  title: const Text(
-                    'اللَّهُمَّ ارْحَمْ أَمْوَاتَنَا',
-                    textDirection: TextDirection.rtl,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontFamily: 'Lateef',
-                      color: Colors.white,
-                    ),
-                  ),
-                  backgroundColor: Colors.transparent,
-                  elevation: 0,
-                  centerTitle: true,
-                  actions: [
-                    IconButton(
-                      tooltip: 'تصدير الدعاء كصورة',
-                      icon: const Icon(Icons.image_outlined, color: Colors.white),
-                      onPressed: _openTemplatePicker,
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.favorite, color: Colors.white),
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => const FavoritesScreen()),
-                        );
-                      },
-                    ),
-                    PopupMenuButton<String>(
-                      icon: const Icon(Icons.more_vert, color: Colors.white),
-                      onSelected: (v) {
-                        if (v == 'search') {
-                          Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => const SearchScreen()));
-                        } else if (v == 'favorites') {
-                          Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => const FavoritesScreen()));
-                        } else if (v == 'settings') {
-                          Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => const SettingsScreen()));
-                        }
-                      },
-                      itemBuilder: (_) => const [
-                        PopupMenuItem(value: 'search', child: Text('البحث')),
-                        PopupMenuItem(
-                            value: 'favorites', child: Text('المفضلة')),
-                        PopupMenuItem(
-                            value: 'settings', child: Text('الإعدادات')),
-                      ],
-                    ),
-                  ],
-                ),
-                body: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      children: [
-                        // ---- Boutons catégories ----
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildCategoryButton(
-                                keyCat: 'normal',
-                                label: 'عام',
-                                isDark: isDark,
-                                cs: cs,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: _buildCategoryButton(
-                                keyCat: 'friday',
-                                label: 'دعاء الجمعة',
-                                isDark: isDark,
-                                cs: cs,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: _buildCategoryButton(
-                                keyCat: 'grave_visit',
-                                label: 'دعاء زيارة القبر',
-                                isDark: isDark,
-                                cs: cs,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const PersonSelectionScreen(),
-                                ),
-                              ).then((_) async {
-                                final newPersonsData = await UserPrefs.getPersonsData();
-
-                                // ✅ DEBUG
-                                print("personsData: $newPersonsData");
-
-                                // ✅ TRÈS IMPORTANT : mettre à jour le state + reset deck
-                                setState(() {
-                                  personsData = newPersonsData;
-
-                                  // 🔥 CRITIQUE : reset du deck
-                                  _deckIds.clear();
-                                  _deckCursor = 0;
-                                });
-
-                                // ✅ rebuild avec NOUVEAU state
-                                await _rebuildDeckFiltered(excludeId: _currentId);
-
-                                if (_deckIds.isNotEmpty) {
-                                  await _showNextFromDeck();
-                                } else {
-                                  await _loadRandomDua();
-                                }
-                              });
-                            },
-                            icon: const Icon(Icons.people_alt_rounded, size: 18),
-                            label: const Text(
-                              'اختيار الأشخاص الذين تريد الدعاء لهم',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontFamily: 'Lateef',
-                              ),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white.withOpacity(0.18),
-                              foregroundColor: Colors.white,
-
-                              side: BorderSide(
-                                color: const Color(0xFFD4AF37).withOpacity(0.7),
-                                width: 1.5,
-                              ),
-
-                              minimumSize: const Size(double.infinity, 36), // ✅ hauteur
-                              padding: const EdgeInsets.symmetric(vertical: 6),
-
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-
-                              elevation: 0,
-                            ),
-                          ),
-                        ),
-
-                        const SizedBox(height: 12),
-// 🧾 CARTE PRINCIPALE — Doré Luxe (motif islamique + dégradé satiné)
-// -----------------------------------------------------
-                        Expanded(
-                          child: SlideTransition(
-                            position: _slide,
-                            child: FadeTransition(
-                              opacity: _fade,
-                              child: Container(
-                                // Ombre externe (relief de la carte)
-                                decoration: const BoxDecoration(
-                                  boxShadow: [
-                                    BoxShadow(
-                                        color: Colors.black26,
-                                        blurRadius: 12,
-                                        offset: Offset(0, 4)),
-                                  ],
-                                ),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(18),
-                                  child: CustomPaint(
-                                    // Motif doré AU-DESSUS du contenu (toujours visible)
-
-                                    foregroundPainter:
-                                        IslamicGoldPatternPainter(
-                                      isDark: isDark,
-                                      onSurface: cs.onSurface,
-
-                                      // Moins visible
-                                      strokeOpacity: 0.10,
-                                      // ↓ trait
-                                      fillOpacity: 0.035,
-                                      // ↓ aplat
-
-                                      // Un peu plus espacé (moins dense)
-                                      cell: 104,
-                                      // 98–104 pour ton écran ; monte à 106 si tu veux encore plus d’air
-                                      starRadius: 20,
-
-                                      // Décalage (stagger)
-                                      phaseX: 22,
-                                      phaseY: 12,
-                                      rowStagger:
-                                          0.5, // 0.5 = décale d’une demi-cellule 1 ligne sur 2
-                                    ),
-
-                                    child: Container(
-                                      // Dégradé de fond : ivoire (clair) / verre dépoli (sombre)
-                                      decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          begin: Alignment.topCenter,
-                                          end: Alignment.bottomCenter,
-                                          colors: isDark
-                                              ? [
-                                                  Colors.white
-                                                      .withOpacity(0.07),
-                                                  Colors.white
-                                                      .withOpacity(0.05),
-                                                ]
-                                              : [
-                                                  const Color(0xFFFFFBF1)
-                                                      .withOpacity(
-                                                          0.98), // ivoire doux
-                                                  const Color(0xFFFFF6E7)
-                                                      .withOpacity(
-                                                          0.92), // ivoire satiné
-                                                ],
-                                        ),
-                                        // Liseré doré ultra discret
-                                        border: Border.all(
-                                          color: const Color(0xFFB8860B)
-                                              .withOpacity(
-                                                  isDark ? 0.20 : 0.15),
-                                          width: 1,
-                                        ),
-                                      ),
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(18),
-                                        child: Stack(
-                                          children: [
-                                            // --- Texte centré ---
-                                            Center(
-                                              child: isGraveVisit
-                                                  ? SizedBox(
-                                                      height:
-                                                          MediaQuery.of(context)
-                                                                  .size
-                                                                  .height *
-                                                              0.6,
-                                                      child:
-                                                          SingleChildScrollView(
-                                                        physics:
-                                                            const BouncingScrollPhysics(),
-                                                        child: Text(
-                                                          _currentDuaText,
-                                                          textAlign:
-                                                              TextAlign.center,
-                                                          style: TextStyle(
-                                                            fontFamily:
-                                                                'Lateef',
-                                                            fontSize: 32,
-                                                            height: 1.7,
-                                                            color: cs.onSurface,
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    )
-                                                  : SingleChildScrollView(
-                                                      physics:
-                                                          const BouncingScrollPhysics(),
-                                                      child: Text(
-                                                        _currentDuaText,
-                                                        textAlign:
-                                                            TextAlign.center,
-                                                        style: TextStyle(
-                                                          fontFamily: 'Lateef',
-                                                          fontSize: 32,
-                                                          height: 1.7,
-                                                          color: cs.onSurface,
-                                                        ),
-                                                      ),
-                                                    ),
-                                            ),
-
-                                            // --- Barre d’actions en bas (❤️ gauche, دعاء آخر droite) ---
-                                            if (!isGraveVisit)
-                                              Positioned(
-                                                left: 0,
-                                                right: 0,
-                                                bottom: 4,
-                                                child: Directionality(
-                                                  textDirection:
-                                                      TextDirection.ltr,
-                                                  child: Row(
-                                                    children: [
-                                                      // ❤️ → gauche
-                                                      ScaleTransition(
-                                                        scale: _heartCtrl,
-                                                        child: InkWell(
-                                                          onTap: () async {
-                                                            if (_currentId ==
-                                                                null) return;
-                                                            HapticFeedback
-                                                                .selectionClick();
-                                                            _heartCtrl
-                                                                .forward()
-                                                                .then((_) =>
-                                                                    _heartCtrl
-                                                                        .reverse());
-
-                                                            await UserPrefs
-                                                                .instance
-                                                                .toggleFavorite(
-                                                                    _currentId!);
-                                                            if (_isFavorite) {
-                                                              await UserPrefs
-                                                                  .saveFavoriteText(
-                                                                      _currentId!,
-                                                                      _currentDuaText);
-                                                            }
-
-                                                            _isFavorite =
-                                                                await UserPrefs
-                                                                    .instance
-                                                                    .isFavorite(
-                                                                        _currentId!);
-                                                            if (mounted)
-                                                              setState(() {});
-                                                          },
-                                                          borderRadius:
-                                                              BorderRadius
-                                                                  .circular(30),
-                                                          child: Container(
-                                                            padding:
-                                                                const EdgeInsets
-                                                                    .all(6),
-                                                            decoration:
-                                                                BoxDecoration(
-                                                              // pastille semi-transparente pour la lisibilité
-                                                              color: Theme.of(
-                                                                      context)
-                                                                  .cardColor
-                                                                  .withOpacity(
-                                                                      isDark
-                                                                          ? 0.85
-                                                                          : 0.92),
-                                                              borderRadius:
-                                                                  BorderRadius
-                                                                      .circular(
-                                                                          30),
-                                                              boxShadow: const [
-                                                                BoxShadow(
-                                                                  color: Colors
-                                                                      .black12,
-                                                                  blurRadius: 6,
-                                                                  offset:
-                                                                      Offset(
-                                                                          0, 2),
-                                                                ),
-                                                              ],
-                                                            ),
-                                                            child: Icon(
-                                                              _isFavorite
-                                                                  ? Icons
-                                                                      .favorite
-                                                                  : Icons
-                                                                      .favorite_border,
-                                                              color: _isFavorite
-                                                                  ? Colors
-                                                                      .redAccent
-                                                                  : cs.onSurface
-                                                                      .withOpacity(
-                                                                          0.7),
-                                                              size: 26,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ),
-
-                                                      const Spacer(),
-
-                                                      // "دعاء آخر" → droite (texte à gauche, icône à droite)
-                                                      OutlinedButton(
-                                                        onPressed:
-                                                            _showNextFromDeck,
-                                                        style: OutlinedButton
-                                                            .styleFrom(
-                                                          side: BorderSide(
-                                                            color: const Color(
-                                                                    0xFFB8860B)
-                                                                .withOpacity(
-                                                                    isDark
-                                                                        ? 0.45
-                                                                        : 0.35),
-                                                            // doré discret
-                                                            width: 1.8,
-                                                          ),
-                                                          backgroundColor: isDark
-                                                              ? cs.surface
-                                                                  .withOpacity(
-                                                                      0.06)
-                                                              : const Color(
-                                                                      0xFFFFF6E7)
-                                                                  .withOpacity(
-                                                                      0.60),
-                                                          foregroundColor:
-                                                              cs.onSurface,
-                                                          padding:
-                                                              const EdgeInsets
-                                                                  .symmetric(
-                                                                  vertical: 8,
-                                                                  horizontal:
-                                                                      24),
-                                                          shape:
-                                                              RoundedRectangleBorder(
-                                                            borderRadius:
-                                                                BorderRadius
-                                                                    .circular(
-                                                                        10),
-                                                          ),
-                                                        ),
-                                                        child: Row(
-                                                          mainAxisSize:
-                                                              MainAxisSize.min,
-                                                          children: const [
-                                                            Text('دعاء آخر',
-                                                                style: TextStyle(
-                                                                    fontFamily:
-                                                                        'Lateef',
-                                                                    fontSize:
-                                                                        24)),
-                                                            SizedBox(width: 8),
-                                                            Icon(Icons
-                                                                .skip_next_rounded),
-                                                          ],
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                              ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        const SizedBox(height: 12),
-
-                        // -----------------------------------------------------
-// RANGÉE COPIER / PARTAGER (texte) — même visuel que les boutons catégories
-// -----------------------------------------------------
-                        if (!isGraveVisit)
-                          Row(
-                            children: [
-                              // === COPIER ===
-                              Expanded(
-                                child: TextButton.icon(
-                                  onPressed: _copyDua,
-                                  // ⚠️ on garde l'action active
-                                  icon: Icon(
-                                    Icons.copy,
-                                    size: 18,
-                                    // même teinte que les catégories inactives
-                                    color: isDark ? cs.onSurface : Colors.white,
-                                  ),
-                                  label: const Text(
-                                    'نسخ',
-                                    style: TextStyle(
-                                        fontFamily: 'Lateef', fontSize: 20),
-                                  ),
-                                  style: TextButton.styleFrom(
-                                    // Visuel "non actif" (identique à tes catégories inactives)
-                                    backgroundColor: isDark
-                                        ? Colors.black.withOpacity(0.25)
-                                        : Colors.white.withOpacity(0.18),
-                                    foregroundColor:
-                                        isDark ? cs.onSurface : Colors.white,
-                                    side: BorderSide(
-                                      color: isDark
-                                          ? Colors.black.withOpacity(0.60)
-                                          : Colors.white,
-                                      width: 2,
-                                    ),
-                                    padding:
-                                        const EdgeInsets.symmetric(vertical: 8),
-                                    shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(12)),
-                                  ),
-                                ),
-                              ),
-
-                              const SizedBox(width: 12),
-
-// === PARTAGER (visuel non actif, mais onPressed actif) ===
-                              if (!isGraveVisit)
-                                Expanded(
-                                  child: TextButton.icon(
-                                    onPressed: _shareDuaText,
-                                    // ⚠️ on garde l'action active
-                                    icon: Icon(
-                                      Icons.share,
-                                      size: 18,
-                                      color:
-                                          isDark ? cs.onSurface : Colors.white,
-                                    ),
-                                    label: const Text(
-                                      'مشاركة',
-                                      style: TextStyle(
-                                          fontFamily: 'Lateef', fontSize: 18),
-                                    ),
-                                    style: TextButton.styleFrom(
-                                      backgroundColor: isDark
-                                          ? Colors.black.withOpacity(0.25)
-                                          : Colors.white.withOpacity(0.18),
-                                      foregroundColor:
-                                          isDark ? cs.onSurface : Colors.white,
-                                      side: BorderSide(
-                                        color: isDark
-                                            ? Colors.black.withOpacity(0.60)
-                                            : Colors.white,
-                                        width: 2,
-                                      ),
-                                      padding: const EdgeInsets.symmetric(
-                                          vertical: 8),
-                                      shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(12)),
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-
-                        const SizedBox(height: 2),
-
-                        // === Bouton WhatsApp : "شارك الأجر – أرسل التطبيق لأهلك" ===
-                        if (!isGraveVisit)
-                          Row(
-                            children: [
-                              // ✅ WhatsApp
-                              Expanded(
-                                child: ElevatedButton.icon(
-                                  onPressed: _shareAppOnWhatsApp,
-                                  icon: FaIcon(FontAwesomeIcons.whatsapp,
-                                      color: Colors.white, size: 18),
-                                  label: const Text(
-                                    'أرسل التطبيق لأهلك',
-                                    style: TextStyle(
-                                        fontFamily: 'Lateef', fontSize: 18),
-                                  ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF1E8449),
-                                    foregroundColor: Colors.white,
-                                    padding:
-                                        const EdgeInsets.symmetric(vertical: 8),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    elevation: 0,
-                                  ),
-                                ),
-                              ),
-
-                              const SizedBox(width: 10),
-
-                              // ✅ مشاركة كصورة (V1.2 — remplace "تقييم
-                              // التطبيق" ; le mécanisme d'évaluation reste
-                              // prévu au MVP, voir _rateApp() ci-dessus,
-                              // conservé pour une intégration dédiée
-                              // ultérieure, non supprimé)
-                              Expanded(
-                                child: FilledButton.icon(
-                                  onPressed: _openTemplatePicker,
-                                  icon: const Icon(Icons.image_outlined,
-                                      color: Colors.white, size: 20),
-                                  label: const Text(
-                                    'مشاركة كصورة',
-                                    style: TextStyle(fontSize: 16),
-                                  ),
-                                  style: FilledButton.styleFrom(
-                                    backgroundColor: const Color(0xFF1E8449),
-                                    padding:
-                                        const EdgeInsets.symmetric(vertical: 8),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
 
           // ---- Rendu hors écran pour l'export Premium (capture PNG) ----
           // Toujours EXACTEMENT une image (décision produit V1.2) :
@@ -1250,15 +1468,44 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           // RenderRepaintBoundary d'avoir un layer composité valide pour
           // toImage(), d'où l'échec silencieux constaté sur appareil réel),
           // Opacity continue de peindre son enfant même à une valeur
-          // proche de 0. Même pattern que l'export "Option A" ci-dessus.
-          IgnorePointer(
-            child: Opacity(
-              opacity: 0.01,
-              child: RepaintBoundary(
-                key: _exportKey,
-                child: PremiumExportCard(
-                  template: _selectedTemplate,
-                  duaText: _currentDuaText,
+          // proche de 0.
+          //
+          // OverflowBox (LOT 3.L) : ce sous-arbre est un enfant non-Positioned
+          // du Stack racine, qui lui impose des contraintes loose bornées à
+          // la taille de l'écran. Sans OverflowBox, le SizedBox interne de
+          // PremiumExportCard (dimensionné à template.fixedTemplateSize, ex.
+          // 1086×1448) est donc clampé à la taille de l'écran par
+          // BoxConstraints.enforce(), et le RepaintBoundary capture une
+          // image à la mauvaise taille/ratio (le dou'a déborde de
+          // duaTextZone). OverflowBox retire cette contrainte max en
+          // passant des contraintes non bornées à son enfant : le
+          // RepaintBoundary est alors layouté exactement à
+          // template.fixedTemplateSize, indépendamment de l'écran.
+          //
+          // Transform.translate (post-QA) : même à 1 %, le modèle restait
+          // perceptible en filigrane derrière le HOME. Décalé d'une largeur
+          // d'écran, il est peint hors du cadre visible (clippé par le Stack)
+          // sans changer ni son layout ni ses contraintes ; `toImage()`
+          // capture la couche du RepaintBoundary, indépendamment de sa
+          // position à l'écran.
+          Transform.translate(
+            offset: Offset(MediaQuery.sizeOf(context).width, 0),
+            child: IgnorePointer(
+              child: Opacity(
+                opacity: 0.01,
+                child: OverflowBox(
+                  minWidth: 0,
+                  minHeight: 0,
+                  maxWidth: double.infinity,
+                  maxHeight: double.infinity,
+                  alignment: Alignment.topLeft,
+                  child: RepaintBoundary(
+                    key: _exportKey,
+                    child: PremiumExportCard(
+                      template: _selectedTemplate,
+                      duaText: _currentDuaText,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -1267,103 +1514,4 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ),
     );
   }
-
-  // ===========================================================================
-  // Boutons de catégorie (عام / الجمعة / رمضان)
-  // ===========================================================================
-  Widget _buildCategoryButton({
-    required String keyCat,
-    required String label,
-    required bool isDark,
-    required ColorScheme cs,
-  }) {
-    final bool isActive = _activeCategory == keyCat;
-
-    final onPressed = () => _setCategory(keyCat); // ← IMPORTANT
-
-    if (isActive) {
-      return ElevatedButton(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor:
-              isDark ? Colors.white.withOpacity(0.22) : Colors.white,
-          foregroundColor: isDark ? cs.onSurface : Colors.teal.shade800,
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-        child: Text(label,
-            style: const TextStyle(fontFamily: 'Lateef', fontSize: 20)),
-      );
-    } else {
-      return OutlinedButton(
-        onPressed: onPressed,
-        style: OutlinedButton.styleFrom(
-          backgroundColor: isDark
-              ? Colors.black.withOpacity(0.25)
-              : Colors.white.withOpacity(0.18),
-          side: BorderSide(
-              color: isDark ? Colors.black.withOpacity(0.60) : Colors.white,
-              width: 2),
-          foregroundColor: isDark ? cs.onSurface : Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-        child: Text(label,
-            style: const TextStyle(fontFamily: 'Lateef', fontSize: 20)),
-      );
-    }
-  }
-}
-
-// (Option déco — conservée si tu la réutilises)
-class IslamicHeaderPainter extends CustomPainter {
-  const IslamicHeaderPainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final stroke = Paint()
-      ..color = Colors.white.withOpacity(0.04)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2;
-    final fill = Paint()
-      ..color = Colors.white.withOpacity(0.05)
-      ..style = PaintingStyle.fill;
-
-    const double cellW = 90;
-    const double cellH = 90;
-
-    for (double y = 0; y < size.height; y += cellH) {
-      for (double x = 0; x < size.width; x += cellW) {
-        _drawStar(canvas, Offset(x + 40, y + 20), 28, stroke, fill);
-      }
-    }
-  }
-
-  void _drawStar(
-      Canvas canvas, Offset center, double r, Paint stroke, Paint fill) {
-    final path = Path();
-    const int points = 16;
-    final double step = (2 * math.pi) / points;
-    final double start = math.pi / 8;
-
-    for (int i = 0; i < points; i++) {
-      final radius = (i % 2 == 0) ? r : r * .45;
-      final double angle = start + i * step;
-      final dx = center.dx + radius * math.cos(angle);
-      final dy = center.dy + radius * math.sin(angle);
-      if (i == 0) {
-        path.moveTo(dx, dy);
-      } else {
-        path.lineTo(dx, dy);
-      }
-    }
-    path.close();
-    canvas.drawPath(path, fill);
-    canvas.drawPath(path, stroke);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

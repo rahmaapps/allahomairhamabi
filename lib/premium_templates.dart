@@ -35,6 +35,9 @@ extension PremiumTemplateX on PremiumTemplate {
   ///
   /// ⚠️ dark_luxe.png est un asset déjà validé visuellement : ne jamais le
   /// régénérer, retoucher ni modifier ses dimensions/zone (V1.2 Phase 11).
+  /// Exception LOT RENAMING : dans les 3 templates, seuls le titre, le
+  /// sous-titre et le footer (« اللهم ارحم أحبّتي » / « دعاء للميت ») ont été
+  /// redessinés ; dimensions, zone du dou'a et décor sont inchangés.
   String get fixedTemplateAsset {
     switch (this) {
       case PremiumTemplate.darkLuxe:

@@ -1,145 +1,72 @@
 // lib/settings_screen.dart
-import 'dart:async';
-import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:workmanager/workmanager.dart' as wm;
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:in_app_review/in_app_review.dart';
 
+import 'app_branding.dart';
+import 'monetization/ad_free_hour_entry.dart';
+import 'monetization/privacy_options_entry.dart';
+import 'monetization/rewarded_wording.dart';
+import 'notification_service.dart';
+import 'theme/app_colors.dart';
+import 'theme/app_spacing.dart';
+import 'theme/app_typography.dart';
 import 'theme_notifier.dart';
 import 'user_prefs.dart';
-import 'notification_service.dart';
+import 'widgets/app_bar.dart';
+import 'widgets/app_card.dart';
+import 'widgets/app_snackbar.dart';
+import 'widgets/rewarded_confirmation_sheet.dart';
 
-/// Identifiants uniques pour WorkManager
-class WorkIds {
-  static const morning = 'period_morning';
-  static const afternoon = 'period_afternoon';
-  static const evening = 'period_evening';
-}
-
-class WorkManagerService {
-  static bool _initialized = false;
-
-  static Future<void> _ensureInitialized() async {
-    if (_initialized) return;
-    await wm.Workmanager().initialize(
-      callbackDispatcher,
-      isInDebugMode: kDebugMode,
-    );
-    _initialized = true;
-  }
-
-  static Duration _initialDelayFor(int hour, int minute) {
-    final now = DateTime.now();
-    var scheduled = DateTime(now.year, now.month, now.day, hour, minute);
-    if (!scheduled.isAfter(now)) {
-      scheduled = scheduled.add(const Duration(days: 1));
-    }
-    return scheduled.difference(now);
-  }
-
-  static Future<void> scheduleDaily({
-    required String uniqueName,
-    required int hour,
-    required int minute,
-  }) async {
-    await _ensureInitialized();
-    final delay = _initialDelayFor(hour, minute);
-    await wm.Workmanager().registerOneOffTask(
-      uniqueName,
-      uniqueName,
-      initialDelay: delay,
-      inputData: {
-        'taskId': uniqueName,
-        'hour': hour,
-        'minute': minute,
-      },
-      existingWorkPolicy: wm.ExistingWorkPolicy.replace,
-      constraints: wm.Constraints(networkType: wm.NetworkType.notRequired),
-      backoffPolicy: wm.BackoffPolicy.linear,
-      backoffPolicyDelay: const Duration(minutes: 5),
-    );
-  }
-
-  static Future<void> cancel(String uniqueName) async {
-    await _ensureInitialized();
-    await wm.Workmanager().cancelByUniqueName(uniqueName);
-  }
-}
-
-@pragma('vm:entry-point')
-void callbackDispatcher() {
-  wm.Workmanager().executeTask((task, inputData) async {
-    try {
-      // ⚠️ Init service de notifications dans l’isolate
-      await NotificationService.ensureInitialized();
-      final id = (inputData?['taskId'] as String?) ?? task;
-      final hour = inputData?['hour'] as int? ?? 7;
-      final minute = inputData?['minute'] as int? ?? 0;
-
-      // Afficher la notification planifiée
-      await NotificationService().showPeriodReminder(
-        periodId: id,
-        hour: hour,
-        minute: minute,
-      );
-
-      // Replanifier pour le lendemain
-      final now = DateTime.now();
-      final next = DateTime(now.year, now.month, now.day, hour, minute)
-          .add(const Duration(days: 1));
-      final nextDelay = next.difference(now);
-
-      await wm.Workmanager().registerOneOffTask(
-        id,
-        id,
-        initialDelay: nextDelay,
-        inputData: {
-          'taskId': id,
-          'hour': hour,
-          'minute': minute,
-        },
-        existingWorkPolicy: wm.ExistingWorkPolicy.replace,
-        constraints: wm.Constraints(networkType: wm.NetworkType.notRequired),
-      );
-
-      return Future.value(true);
-    } catch (e, st) {
-      if (kDebugMode) {
-        // ignore: avoid_print
-        print('[WorkManager] Erreur tâche "$task": $e\n$st');
-      }
-      return Future.value(false);
-    }
-  });
-}
-
+/// Paramètres — spécification consolidée (docs/ui_ux/ETAT_CONSOLIDE_UI_UX.md,
+/// §4) adaptée par les décisions verrouillées du LOT 3.G : بعد الظهر
+/// supprimé, تدعو لـ retiré de cet écran (déjà accessible ailleurs). Les 3
+/// rappels (صباح/مساء/جمعة) ont chacun une activation + une heure
+/// configurable et persistée séparément (évolution post-LOT 3.G : صباح,
+/// مساء et جمعة suivent désormais tous le même pattern). Enregistrement
+/// immédiat de chaque changement — aucun bouton de sauvegarde.
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
+
+  /// Texte de partage validé (LOT 3.O — « مشاركة التطبيق »). Mécanisme natif
+  /// uniquement (`Share.share`), aucune logique spécifique à une app tierce
+  /// (remplace l'ancienne intégration WhatsApp de `home_screen.dart`,
+  /// supprimée par ce lot). Exposé pour `test/app_branding_test.dart`.
+  @visibleForTesting
+  static const shareAppText =
+      '${AppBranding.appName}\n'
+      '${AppBranding.descriptor} 🤍\n'
+      '\n'
+      'شارك الأجر مع من تحب:\n'
+      'https://play.google.com/store/apps/details?id=com.joumane.allahomairhamabi';
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  // ---- Thème
-  String _selectedTheme = "system"; // system | light | dark
+  String _selectedTheme = 'system';
 
-  // ---- Longueur
-  String _lengthFilter = "all"; // all | short | long
-
-  // ---- Périodes
   bool _enableMorning = true;
-  bool _enableAfternoon = true;
+  TimeOfDay _morningTime = const TimeOfDay(hour: 9, minute: 0);
   bool _enableEvening = true;
-
-  TimeOfDay _morningTime = const TimeOfDay(hour: 10, minute: 0);
-  TimeOfDay _afternoonTime = const TimeOfDay(hour: 15, minute: 0);
   TimeOfDay _eveningTime = const TimeOfDay(hour: 20, minute: 0);
+  bool _enableFriday = false;
+  TimeOfDay _fridayTime = const TimeOfDay(hour: 9, minute: 0);
 
   bool _loading = true;
+
+  /// LOT 5.E — entrée « خيارات الخصوصية ». Le statut est réinterrogé à
+  /// chaque ouverture de cet écran (une nouvelle instance d'état est créée
+  /// à chaque navigation) : il n'est jamais déduit d'un état UMP mis en
+  /// cache au démarrage, qui peut ne pas être encore exploitable.
+  final PrivacyOptionsEntry _privacyOptions = PrivacyOptionsEntry();
+  bool _privacyOptionsRequired = false;
+
+  /// LOT 5.G.B — ligne « une heure sans publicité » (B1). État relu à
+  /// chaque ouverture de l'écran, jamais mis en cache.
+  final AdFreeHourEntry _adFreeHour = AdFreeHourEntry();
 
   @override
   void initState() {
@@ -150,48 +77,64 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _bootstrap() async {
     await NotificationService.ensureInitialized(); // UI isolate
     await _loadPrefs();
+    // Le nettoyage de l'ancienne tâche `period_afternoon` (compatibilité
+    // utilisateurs existants) vit désormais dans `main()` — exécuté au
+    // démarrage réel de l'app, indépendamment de l'ouverture de cet écran.
+
+    // LOT 5.E — après `_loadPrefs()` : l'affichage des réglages ne doit
+    // jamais attendre une réponse du SDK de consentement.
+    await _refreshPrivacyOptionsRequirement();
+
+    // LOT 5.G.B — même principe : l'affichage des réglages n'attend jamais
+    // l'état publicitaire.
+    await _adFreeHour.refresh();
+  }
+
+  @override
+  void dispose() {
+    _adFreeHour.dispose();
+    super.dispose();
+  }
+
+  /// Ne lève jamais (garantie de [PrivacyOptionsEntry]) : au pire la ligne
+  /// reste absente.
+  Future<void> _refreshPrivacyOptionsRequirement() async {
+    final required = await _privacyOptions.isRequired();
+    if (!mounted) return;
+    if (required == _privacyOptionsRequired) return;
+    setState(() => _privacyOptionsRequired = required);
   }
 
   Future<void> _loadPrefs() async {
     final prefs = UserPrefs();
 
     final th = await prefs.getThemeMode();
-    final lf = await prefs.getLengthFilter();
-
-    final enM = await prefs.getEnableMorning();
-    final enA = await prefs.getEnableAfternoon();
-    final enE = await prefs.getEnableEvening();
-
+    final enM = await prefs.getMorningEnabled();
     final tmM = await prefs.getMorningTime();
-    final tmA = await prefs.getAfternoonTime();
+    final enE = await prefs.getEveningEnabled();
     final tmE = await prefs.getEveningTime();
+    final enF = await prefs.getFridayEnabled();
+    final tmF = await prefs.getFridayTime();
 
     if (!mounted) return;
     setState(() {
       _selectedTheme = th;
-      _lengthFilter = lf;
-
       _enableMorning = enM;
-      _enableAfternoon = enA;
-      _enableEvening = enE;
-
       _morningTime = tmM;
-      _afternoonTime = tmA;
+      _enableEvening = enE;
       _eveningTime = tmE;
-
+      _enableFriday = enF;
+      _fridayTime = tmF;
       _loading = false;
     });
 
     await _syncBackgroundSchedules();
   }
 
-  Future<void> _pickTime({
-    required TimeOfDay initial,
-    required ValueChanged<TimeOfDay> onPicked,
-  }) async {
-    final res = await showTimePicker(
+  Future<TimeOfDay?> _showRtlTimePicker(TimeOfDay initialTime) {
+    return showTimePicker(
       context: context,
-      initialTime: initial,
+      initialTime: initialTime,
       builder: (context, child) {
         return Directionality(
           textDirection: TextDirection.rtl,
@@ -199,411 +142,576 @@ class _SettingsScreenState extends State<SettingsScreen> {
         );
       },
     );
-    if (res != null) onPicked(res);
   }
 
+  Future<void> _pickMorningTime() async {
+    final res = await _showRtlTimePicker(_morningTime);
+    if (res == null) return;
+    setState(() => _morningTime = res);
+    await UserPrefs().setMorningTime(res);
+    await _syncBackgroundSchedules();
+  }
+
+  Future<void> _pickEveningTime() async {
+    final res = await _showRtlTimePicker(_eveningTime);
+    if (res == null) return;
+    setState(() => _eveningTime = res);
+    await UserPrefs().setEveningTime(res);
+    await _syncBackgroundSchedules();
+  }
+
+  Future<void> _pickFridayTime() async {
+    final res = await _showRtlTimePicker(_fridayTime);
+    if (res == null) return;
+    setState(() => _fridayTime = res);
+    await UserPrefs().setFridayTime(res);
+    await _syncBackgroundSchedules();
+  }
+
+  /// À l'activation d'un rappel (jamais au changement d'heure d'un rappel
+  /// déjà actif), propose l'alarme exacte si elle n'est pas déjà accordée
+  /// — ouvre l'écran système « Alarmes et rappels »
+  /// (`NotificationService.requestExactAlarmsPermission`). N'a aucun effet
+  /// bloquant : que l'utilisateur accorde ou non, l'activation se poursuit
+  /// normalement ensuite via `_syncBackgroundSchedules` — qui choisira
+  /// `exactAllowWhileIdle` si accordée, ou le repli `inexactAllowWhileIdle`
+  /// déjà en place sinon (logique inchangée, entièrement dans
+  /// `NotificationService._scheduleZoned`).
+  Future<void> _requestExactAlarmIfNeeded() async {
+    final notifications = NotificationService();
+    if (!await notifications.canScheduleExactAlarms()) {
+      await notifications.requestExactAlarmsPermission();
+    }
+  }
+
+  Future<void> _setMorningEnabled(bool v) async {
+    if (v) {
+      await _requestExactAlarmIfNeeded();
+    }
+    setState(() => _enableMorning = v);
+    await UserPrefs().setMorningEnabled(v);
+    await _syncBackgroundSchedules();
+  }
+
+  Future<void> _setEveningEnabled(bool v) async {
+    if (v) {
+      await _requestExactAlarmIfNeeded();
+    }
+    setState(() => _enableEvening = v);
+    await UserPrefs().setEveningEnabled(v);
+    await _syncBackgroundSchedules();
+  }
+
+  Future<void> _setFridayEnabled(bool v) async {
+    if (v) {
+      await _requestExactAlarmIfNeeded();
+    }
+    setState(() => _enableFriday = v);
+    await UserPrefs().setFridayEnabled(v);
+    await _syncBackgroundSchedules();
+  }
+
+  /// Applique aux rappels natifs l'état actuel de [_enableMorning] /
+  /// [_enableEvening] / [_enableFriday] (+ heures). `NotificationService`
+  /// ne lève jamais d'exception : chaque planification retourne `true`/
+  /// `false` selon le succès réel. En cas d'échec, le rappel concerné est
+  /// explicitement repassé à désactivé (état + préférence persistée) —
+  /// jamais laissé « activé » dans l'UI alors qu'aucune notification n'est
+  /// réellement programmée auprès de l'OS — et l'utilisateur en est informé.
   Future<void> _syncBackgroundSchedules() async {
+    final notifications = NotificationService();
+    var scheduleFailed = false;
+
     if (_enableMorning) {
-      await WorkManagerService.scheduleDaily(
-        uniqueName: WorkIds.morning,
+      final ok = await notifications.scheduleDailyReminder(
+        periodId: 'period_morning',
         hour: _morningTime.hour,
         minute: _morningTime.minute,
       );
+      if (!ok) {
+        scheduleFailed = true;
+        _enableMorning = false;
+        await UserPrefs().setMorningEnabled(false);
+      }
     } else {
-      await WorkManagerService.cancel(WorkIds.morning);
-    }
-
-    if (_enableAfternoon) {
-      await WorkManagerService.scheduleDaily(
-        uniqueName: WorkIds.afternoon,
-        hour: _afternoonTime.hour,
-        minute: _afternoonTime.minute,
-      );
-    } else {
-      await WorkManagerService.cancel(WorkIds.afternoon);
+      await notifications.cancelReminder(NotificationService.notificationIdMorning);
     }
 
     if (_enableEvening) {
-      await WorkManagerService.scheduleDaily(
-        uniqueName: WorkIds.evening,
+      final ok = await notifications.scheduleDailyReminder(
+        periodId: 'period_evening',
         hour: _eveningTime.hour,
         minute: _eveningTime.minute,
       );
+      if (!ok) {
+        scheduleFailed = true;
+        _enableEvening = false;
+        await UserPrefs().setEveningEnabled(false);
+      }
     } else {
-      await WorkManagerService.cancel(WorkIds.evening);
+      await notifications.cancelReminder(NotificationService.notificationIdEvening);
     }
-  }
 
-  /*Future<void> _rateApp() async {
-    final InAppReview inAppReview = InAppReview.instance;
-    if (await inAppReview.isAvailable()) {
-      // Ouvre la popup native d'évaluation
-      await inAppReview.requestReview();
-    } else {
-      // Ouvre la page Play Store (après publication officielle)
-      await inAppReview.openStoreListing(
-        appStoreId: '', // pas utilisé sur Android
+    if (_enableFriday) {
+      final ok = await notifications.scheduleWeeklyReminder(
+        periodId: 'period_friday',
+        weekday: DateTime.friday,
+        hour: _fridayTime.hour,
+        minute: _fridayTime.minute,
       );
+      if (!ok) {
+        scheduleFailed = true;
+        _enableFriday = false;
+        await UserPrefs().setFridayEnabled(false);
+      }
+    } else {
+      await notifications.cancelReminder(NotificationService.notificationIdFriday);
     }
-  }*/
 
-  Future<void> _saveAll() async {
-    final prefs = UserPrefs();
-
-    await prefs.setThemeMode(_selectedTheme);
-    await prefs.setLengthFilter(_lengthFilter);
-
-    await prefs.setEnableMorning(_enableMorning);
-    await prefs.setEnableAfternoon(_enableAfternoon);
-    await prefs.setEnableEvening(_enableEvening);
-
-    await prefs.setMorningTime(_morningTime);
-    await prefs.setAfternoonTime(_afternoonTime);
-    await prefs.setEveningTime(_eveningTime);
-
-    await _syncBackgroundSchedules();
-
-    // ✅ Marquer les réglages comme complétés
-    final sp = await SharedPreferences.getInstance();
-    await sp.setBool('settings_completed', true);
-
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('تم الحفظ بنجاح')),
-    );
-
-    // ✅ Remplacer toute la pile par /home (pas de pop → pas d’écran noir)
-    Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
+    if (scheduleFailed && mounted) {
+      setState(() {}); // reflète l'état corrigé (rappel repassé à désactivé)
+      showAppToast(context, 'تعذّرت برمجة أحد التذكيرات — أعد المحاولة لاحقًا');
+    }
   }
 
-  void _openPrivacy() async {
-    // ⚠️ Mets ici exactement l’URL qui répond (index.html ou privacy_ar.html)
+  /// « مشاركة التطبيق » (LOT 3.O) — distincte du Partage Premium
+  /// (`مشاركة كصورة`, image d'un dou'a). Mécanisme natif de la plateforme
+  /// uniquement (`Share.share`, déjà utilisé ailleurs dans le projet pour le
+  /// dou'a — `home_screen.dart`, `dua_read_screen.dart`), aucune dépendance
+  /// nouvelle, aucune logique propre à une app tierce.
+  Future<void> _shareApp() async {
+    await Share.share(SettingsScreen.shareAppText);
+  }
+
+  /// « خيارات الخصوصية » (LOT 5.E) — ouvre le formulaire UMP d'options de
+  /// confidentialité, seul moyen pour l'utilisateur de revenir sur son
+  /// consentement publicitaire. Même traitement d'erreur que
+  /// [_openAbout] : un toast arabe déjà existant (`showAppToast`), jamais
+  /// un crash, jamais un blocage de l'écran.
+  Future<void> _openPrivacyOptions() async {
+    final opened = await _privacyOptions.open();
+    if (!mounted) return;
+
+    if (!opened) {
+      showAppToast(context, 'تعذّر فتح خيارات الخصوصية');
+      return;
+    }
+
+    // Le statut a pu changer pendant l'affichage du formulaire.
+    await _refreshPrivacyOptionsRequirement();
+  }
+
+  Future<void> _openAbout() async {
     final uri = Uri.parse(
-      'https://rahmaapps.github.io/allahomairhamabi/privacy_ar.html',
+      'https://rahmaapps.github.io/allahomairhamabi/',
     );
     try {
       final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
       if (!ok && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('لا يمكن فتح صفحة سياسة الخصوصية'),
-            duration: Duration(seconds: 2),
-          ),
-        );
+        showAppToast(context, 'تعذّر فتح صفحة حول التطبيق');
       }
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('حدث خطأ أثناء فتح الصفحة'),
-          duration: Duration(seconds: 2),
-        ),
-      );
+      showAppToast(context, 'تعذّر فتح صفحة حول التطبيق');
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    // Même lecture que Favoris/Recherche (LOT 2.2) : ivoire fixe par mode,
+    // jamais `ColorScheme.onPrimary` (illisible sur le fond `appBar` Dark).
+    final appBarForeground =
+        isDark ? AppColorsDark.textPrimary : AppColorsLight.onPrimary;
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text('الإعدادات'),
+        appBar: AppTopBar(
+          title: 'الإعدادات',
+          height: 52,
+          titleStyle: AppTypography.sectionTitle.copyWith(color: appBarForeground),
         ),
-
-        // ✅ Corps : seul le contenu défile
+        // Lecture locale (§P2-B) — même traitement que Recherche/
+        // DuaReadScreen/Favoris/Visite : aucun indicateur de chargement.
         body: _loading
-            ? const Center(child: CircularProgressIndicator())
+            ? const SizedBox.shrink()
             : SafeArea(
-          child: GestureDetector(
-            // Fermer le clavier au tap
-            onTap: () => FocusScope.of(context).unfocus(),
-            child: Padding(
-              padding: EdgeInsets.only(
-                // Laisse de la place si le clavier est ouvert
-                bottom: MediaQuery.of(context).viewInsets.bottom,
-              ),
-              child: Column(
-                children: [
-                  // Le contenu qui scrolle
-                  Expanded(
-                    child: ListView(
-                      padding: const EdgeInsets.all(16),
-                      children: _buildSettingsList(context),
+                child: ListView(
+                  padding: const EdgeInsets.all(AppSpacing.xl),
+                  children: [
+                    const _SectionTitle('التذكير'),
+                    const SizedBox(height: AppSpacing.sm),
+                    AppCard(
+                      level: AppCardLevel.settingsGroup,
+                      child: Column(
+                        children: [
+                          _ReminderRow(
+                            label: 'تذكير الصباح',
+                            enabled: _enableMorning,
+                            time: _morningTime,
+                            onToggle: _setMorningEnabled,
+                            onPickTime: _pickMorningTime,
+                          ),
+                          const _RowDivider(),
+                          _ReminderRow(
+                            label: 'تذكير المساء',
+                            enabled: _enableEvening,
+                            time: _eveningTime,
+                            onToggle: _setEveningEnabled,
+                            onPickTime: _pickEveningTime,
+                          ),
+                          const _RowDivider(),
+                          _ReminderRow(
+                            label: 'تذكير الجمعة',
+                            enabled: _enableFriday,
+                            time: _fridayTime,
+                            onToggle: _setFridayEnabled,
+                            onPickTime: _pickFridayTime,
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                ],
+                    const SizedBox(height: AppSpacing.xxxl),
+                    const _SectionTitle('التطبيق'),
+                    const SizedBox(height: AppSpacing.sm),
+                    AppCard(
+                      level: AppCardLevel.settingsGroup,
+                      child: Column(
+                        children: [
+                          _ThemeRow(
+                            value: _selectedTheme,
+                            onChanged: (v) async {
+                              setState(() => _selectedTheme = v);
+                              await context.read<ThemeNotifier>().setTheme(v);
+                            },
+                          ),
+                          const _RowDivider(),
+                          _SettingsLinkRow(label: 'عن التطبيق', onTap: _openAbout),
+                          // LOT 5.G.B — B1 : exactement entre « عن التطبيق »
+                          // et « خيارات الخصوصية ». Toujours visible ; porte
+                          // elle-même son séparateur.
+                          AdFreeHourSettingsRow(entry: _adFreeHour),
+                          // LOT 5.E — présente UNIQUEMENT quand Google
+                          // exige un point d'entrée « Options de
+                          // confidentialité » (`isPrivacyOptionsRequired`).
+                          // Absente sinon : jamais une ligne grisée, même
+                          // traitement que la ligne d'heure d'un rappel
+                          // désactivé.
+                          if (_privacyOptionsRequired) ...[
+                            const _RowDivider(),
+                            _SettingsLinkRow(
+                              label: 'خيارات الخصوصية',
+                              onTap: _openPrivacyOptions,
+                            ),
+                          ],
+                          const _RowDivider(),
+                          _SettingsLinkRow(label: 'مشاركة التطبيق', onTap: _shareApp),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ),
-        ),
-
-        // ✅ Bouton "حفظ" FIXÉ en bas (toujours visible)
-        bottomNavigationBar: SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                icon: const Icon(Icons.save),
-                label: const Text('حفظ',style: TextStyle(color: Colors.white,fontSize: 20),),
-                onPressed: _saveAll,
-              ),
-            ),
-          ),
-        ),
       ),
     );
-  }
-
-  /// Construit la liste scrollable : tout ton contenu existant,
-  /// SANS le bouton "حفظ" (désormais fixé en bas).
-  List<Widget> _buildSettingsList(BuildContext context) {
-    return [
-
-      const SizedBox(height: 32),
-
-      // const _SectionTitle('الفترات (إشعارات)'),
-      const SizedBox(height: 8),
-
-      _PeriodTile(
-        title: 'الصباح',
-        enabled: _enableMorning,
-        time: _morningTime,
-        onToggle: (v) async {
-          setState(() => _enableMorning = v);
-          await UserPrefs().setEnableMorning(v);
-          await _syncBackgroundSchedules();
-        },
-        onPickTime: () async {
-          await _pickTime(
-            initial: _morningTime,
-            onPicked: (t) async {
-              setState(() => _morningTime = t);
-              await UserPrefs().setMorningTime(t);
-              await _syncBackgroundSchedules();
-            },
-          );
-        },
-      ),
-      _PeriodTile(
-        title: 'بعد الظهر',
-        enabled: _enableAfternoon,
-        time: _afternoonTime,
-        onToggle: (v) async {
-          setState(() => _enableAfternoon = v);
-          await UserPrefs().setEnableAfternoon(v);
-          await _syncBackgroundSchedules();
-        },
-        onPickTime: () async {
-          await _pickTime(
-            initial: _afternoonTime,
-            onPicked: (t) async {
-              setState(() => _afternoonTime = t);
-              await UserPrefs().setAfternoonTime(t);
-              await _syncBackgroundSchedules();
-            },
-          );
-        },
-      ),
-      _PeriodTile(
-        title: 'المساء',
-        enabled: _enableEvening,
-        time: _eveningTime,
-        onToggle: (v) async {
-          setState(() => _enableEvening = v);
-          await UserPrefs().setEnableEvening(v);
-          await _syncBackgroundSchedules();
-        },
-        onPickTime: () async {
-          await _pickTime(
-            initial: _eveningTime,
-            onPicked: (t) async {
-              setState(() => _eveningTime = t);
-              await UserPrefs().setEveningTime(t);
-              await _syncBackgroundSchedules();
-            },
-          );
-        },
-      ),
-
-      const SizedBox(height: 32),
-
-      const _SectionTitle('الثيم'),
-      const SizedBox(height: 8),
-      Row(
-        children: [
-          const Text('الوضع', style: TextStyle(fontSize: 16)),
-          const SizedBox(width: 16),
-          DropdownButton<String>(
-            value: _selectedTheme,
-            items: const [
-              DropdownMenuItem(value: 'system', child: Text('حسب النظام')),
-              DropdownMenuItem(value: 'light', child: Text('فاتح')),
-              DropdownMenuItem(value: 'dark', child: Text('داكن')),
-            ],
-            onChanged: (v) async {
-              if (v == null) return;
-              setState(() => _selectedTheme = v);
-              final notifier =
-              Provider.of<ThemeNotifier>(context, listen: false);
-              await notifier.setTheme(v);
-            },
-          ),
-        ],
-      ),
-      const SizedBox(height: 24),
-
-      /* Paramètre désactivé pour le moment
-      const _SectionTitle('الطول المفضّل'),
-      const SizedBox(height: 8),
-      Wrap(
-        spacing: 8,
-        children: [
-          ChoiceChip(
-            label: const Text('الكل'),
-            selected: _lengthFilter == 'all',
-            onSelected: (s) async {
-              if (!s) return;
-              setState(() => _lengthFilter = 'all');
-              await UserPrefs().setLengthFilter('all');
-            },
-          ),
-          ChoiceChip(
-            label: const Text('قصيرة'),
-            selected: _lengthFilter == 'short',
-            onSelected: (s) async {
-              if (!s) return;
-              setState(() => _lengthFilter = 'short');
-              await UserPrefs().setLengthFilter('short');
-            },
-          ),
-          ChoiceChip(
-            label: const Text('طويلة'),
-            selected: _lengthFilter == 'long',
-            onSelected: (s) async {
-              if (!s) return;
-              setState(() => _lengthFilter = 'long');
-              await UserPrefs().setLengthFilter('long');
-            },
-          ),
-        ],
-      ),
-      const SizedBox(height: 24),
-      */
-
-      /* === تقييم التطبيق ===
-      SizedBox(
-        width: double.infinity,
-        child: FilledButton.icon(
-          style: FilledButton.styleFrom(
-            backgroundColor: const Color(0xFF1E8449), // أخضر جميل
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-          icon: const Icon(Icons.star_rate_rounded, color: Colors.white),
-          label: const Text(
-            'تقييم التطبيق',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          onPressed: _rateApp,
-        ),
-      ),*/
-
-      const SizedBox(height: 32),
-
-// ==== Bouton "حول التطبيق" ====
-      ListTile(
-        leading: const Icon(Icons.info, color: Colors.blueGrey),
-        title: const Text(
-          'حول التطبيق',
-          style: TextStyle(fontSize: 18),
-        ),
-        onTap: () async {
-          final uri = Uri.parse(
-              'https://rahmaapps.github.io/allahomairhamabi/'
-          );
-          try {
-            await launchUrl(uri, mode: LaunchMode.externalApplication);
-          } catch (_) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('تعذّر فتح صفحة حول التطبيق')),
-            );
-          }
-        },
-      ),
-
-      const SizedBox(height: 20),
-
-      // === سياسة الخصوصية ===
-      ListTile(
-        leading: const Icon(Icons.privacy_tip),
-        title: const Text(
-          'سياسة الخصوصية',
-          style: TextStyle(fontSize: 18),
-        ),
-        onTap: _openPrivacy,
-      ),
-
-      const SizedBox(height: 8),
-
-      // ⚠️ Ne PAS remettre le bouton "حفظ" ici :
-      // Il est maintenant fixé en bas via bottomNavigationBar.
-    ];
   }
 }
 
 class _SectionTitle extends StatelessWidget {
-  final String text;
   const _SectionTitle(this.text);
+  final String text;
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Text(
       text,
       textDirection: TextDirection.rtl,
-      style: const TextStyle(
-        fontSize: 18,
-        fontWeight: FontWeight.w700,
-      ),
+      style: AppTypography.sectionTitle.copyWith(color: cs.onSurface),
     );
   }
 }
 
-class _PeriodTile extends StatelessWidget {
-  final String title;
-  final bool enabled;
-  final TimeOfDay time;
-  final ValueChanged<bool> onToggle;
-  final VoidCallback onPickTime;
+/// Séparateur 1 px pleine largeur entre deux lignes d'un même groupe de
+/// réglages (§4 : « absents sur la dernière ligne » — c'est l'appelant qui
+/// n'en insère pas après la dernière ligne, ce widget ne le décide pas).
+class _RowDivider extends StatelessWidget {
+  const _RowDivider();
 
-  const _PeriodTile({
-    required this.title,
+  @override
+  Widget build(BuildContext context) {
+    return Container(height: 1, color: Theme.of(context).colorScheme.outline);
+  }
+}
+
+/// Rappel (صباح/مساء/جمعة) + الوقت — reprend strictement le pattern déjà
+/// validé de `OnboardingScreen._buildReminderStep` (Switch puis ligne
+/// d'heure qui disparaît, jamais grisée, si désactivé). Les 3 rappels
+/// partagent ce même composant : chacun a sa propre heure configurable.
+class _ReminderRow extends StatelessWidget {
+  const _ReminderRow({
+    required this.label,
     required this.enabled,
     required this.time,
     required this.onToggle,
     required this.onPickTime,
   });
 
+  final String label;
+  final bool enabled;
+  final TimeOfDay time;
+  final ValueChanged<bool> onToggle;
+  final VoidCallback onPickTime;
+
   @override
   Widget build(BuildContext context) {
-    final timeLabel =
-        '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
-    return Card(
-      child: ListTile(
-        title: Text(
-          title,
-          style: const TextStyle(fontSize: 16),
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.xl,
+        vertical: AppSpacing.md,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Toute la ligne est cliquable (§P1-J), pas seulement l'interrupteur
+          // — même comportement d'activation/désactivation qu'avant
+          // (`onToggle(!enabled)` reproduit exactement ce que `Switch.onChanged`
+          // recevait déjà pour un tap simple). `IgnorePointer` sur le `Switch`
+          // évite un double-basculement : un seul gestionnaire de tap (cet
+          // `InkWell`) gouverne toute la zone, y compris visuellement
+          // au-dessus de l'interrupteur.
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => onToggle(!enabled),
+              splashFactory: NoSplash.splashFactory,
+              highlightColor: Colors.transparent,
+              child: Row(
+                textDirection: TextDirection.rtl,
+                children: [
+                  Expanded(
+                    child: Text(
+                      label,
+                      textDirection: TextDirection.rtl,
+                      style: AppTypography.body.copyWith(color: cs.onSurface),
+                    ),
+                  ),
+                  IgnorePointer(
+                    child: Switch(
+                      value: enabled,
+                      activeThumbColor: cs.primary,
+                      onChanged: onToggle,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // La ligne « الوقت » disparaît complètement si désactivé — jamais
+          // grisée (§4).
+          if (enabled) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Row(
+              textDirection: TextDirection.rtl,
+              children: [
+                Expanded(
+                  child: Text(
+                    'الوقت',
+                    textDirection: TextDirection.rtl,
+                    style: AppTypography.body.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: onPickTime,
+                  child: Text(
+                    '${time.hour.toString().padLeft(2, '0')}:'
+                    '${time.minute.toString().padLeft(2, '0')}',
+                    textDirection: TextDirection.rtl,
+                    style: AppTypography.display.copyWith(fontSize: 26, color: cs.primary),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// المظهر (تلقائي/فاتح/داكن) — aucun composant de sélection à 3 options
+/// n'existe dans le Design System ; `DropdownButton` conservé (comportement
+/// inchangé, branché sur `ThemeNotifier`) mais reskiné avec les tokens
+/// typographiques/couleur du projet plutôt que le style Material par défaut.
+class _ThemeRow extends StatelessWidget {
+  const _ThemeRow({required this.value, required this.onChanged});
+
+  final String value;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.xl,
+        vertical: AppSpacing.md,
+      ),
+      child: Row(
+        textDirection: TextDirection.rtl,
+        children: [
+          Expanded(
+            child: Text(
+              'المظهر',
+              textDirection: TextDirection.rtl,
+              style: AppTypography.body.copyWith(color: cs.onSurface),
+            ),
+          ),
+          DropdownButton<String>(
+            value: value,
+            underline: const SizedBox.shrink(),
+            dropdownColor: cs.surface,
+            style: AppTypography.body.copyWith(color: cs.onSurface),
+            items: const [
+              DropdownMenuItem(value: 'system', child: Text('تلقائي')),
+              DropdownMenuItem(value: 'light', child: Text('فاتح')),
+              DropdownMenuItem(value: 'dark', child: Text('داكن')),
+            ],
+            onChanged: (v) {
+              if (v != null) onChanged(v);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// LOT 5.G.B — ligne « une heure sans publicité » (B1/B3/B5/B6).
+///
+/// Publique pour être testée seule : `SettingsScreen` n'est pas testable en
+/// widget (`_bootstrap()` attend un canal de plateforme natif), limitation
+/// déjà documentée dans ce projet. Réutilise strictement `_SettingsLinkRow`
+/// et `_RowDivider` — aucun nouveau style.
+///
+/// - TOUJOURS visible (B1), y compris quand le Rewarded est indisponible.
+/// - Heure active : jamais masquée ni désactivée (B5), temps restant réel.
+/// - Tap : confirmation → Rewarded → toast de succès (B6). Un échec ou une
+///   fermeture anticipée ramène simplement à l'invitation, sans message.
+class AdFreeHourSettingsRow extends StatefulWidget {
+  const AdFreeHourSettingsRow({
+    super.key,
+    required this.entry,
+    this.confirm = showRewardedConfirmation,
+  });
+
+  final AdFreeHourEntry entry;
+
+  /// Injection réservée aux tests ; confirmation réelle par défaut.
+  final Future<bool> Function(BuildContext context) confirm;
+
+  @override
+  State<AdFreeHourSettingsRow> createState() => _AdFreeHourSettingsRowState();
+}
+
+class _AdFreeHourSettingsRowState extends State<AdFreeHourSettingsRow> {
+  @override
+  void initState() {
+    super.initState();
+    widget.entry.addListener(_onEntryChanged);
+  }
+
+  @override
+  void didUpdateWidget(AdFreeHourSettingsRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.entry != widget.entry) {
+      oldWidget.entry.removeListener(_onEntryChanged);
+      widget.entry.addListener(_onEntryChanged);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.entry.removeListener(_onEntryChanged);
+    super.dispose();
+  }
+
+  void _onEntryChanged() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _onTap() async {
+    final entry = widget.entry;
+    if (entry.state == AdFreeHourEntryState.loading) return;
+
+    final result = await entry.activate(confirm: () => widget.confirm(context));
+    if (!mounted) return;
+
+    switch (result) {
+      case AdFreeHourResult.earned:
+        showAppToast(context, RewardedWording.adFreeHourEarned);
+      case AdFreeHourResult.alreadyActive:
+        // B3/B5 : aucun Rewarded, le temps restant est rappelé.
+        showAppToast(context, entry.label);
+      case AdFreeHourResult.cancelled:
+      case AdFreeHourResult.notEarned:
+        // Aucun message : la ligne revient simplement à l'invitation.
+        break;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final entry = widget.entry;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const _RowDivider(),
+        _SettingsLinkRow(label: entry.label, onTap: _onTap),
+      ],
+    );
+  }
+}
+
+/// عن التطبيق — ligne cliquable pleine largeur, chevron RTL (`‹`, cohérent
+/// avec `AppVisitBandeau`), pas de `ListTile` Material brut.
+class _SettingsLinkRow extends StatelessWidget {
+  const _SettingsLinkRow({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        splashFactory: NoSplash.splashFactory,
+        highlightColor: Colors.transparent,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.xl,
+            vertical: AppSpacing.md,
+          ),
+          child: Row(
+            textDirection: TextDirection.rtl,
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  textDirection: TextDirection.rtl,
+                  style: AppTypography.body.copyWith(color: cs.onSurface),
+                ),
+              ),
+              Icon(Icons.chevron_left, size: 20, color: cs.onSurfaceVariant),
+            ],
+          ),
         ),
-        subtitle: Text('الساعة: $timeLabel'),
-        trailing: Switch(
-          value: enabled,
-          onChanged: onToggle,
-        ),
-        onTap: onPickTime,
       ),
     );
   }
