@@ -47,3 +47,4 @@ app.*.map.json
 # Secrets locaux (signature release, SDK local) — ne jamais committer
 android/key.properties
 android/local.properties
+artifacts/
